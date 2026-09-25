@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2d6a4f">
+  <title>Session Status — WiFi Portal</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <header class="portal-header" role="banner">
+      <div class="logo-container">
+        <svg class="logo-svg" width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="52" height="52" rx="14" fill="#2d6a4f"/>
+          <path d="M9 32 Q26 14 43 32" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M17 38 Q26 27 35 38" stroke="rgba(255,255,255,0.75)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <circle cx="26" cy="43" r="2.5" fill="white"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1 class="brand-name">Bukuhan WiFi</h1>
+        <p class="brand-tagline">Your Session</p>
+      </div>
+    </header>
+
+    <main class="portal-main" role="main">
+
+      <!-- Loading state -->
+      <div id="loading-state" class="status-card" aria-busy="true" aria-label="Loading session information">
+        <div class="spinner-container">
+          <div class="spinner" role="img" aria-label="Loading"></div>
+          <p>Checking your session…</p>
+        </div>
+      </div>
+
+      <!-- Active session state -->
+      <section id="session-active" class="status-card hidden" aria-labelledby="active-heading" aria-live="polite">
+        <h2 id="active-heading" class="card-title card-title--status">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2d6a4f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          Session Active
+        </h2>
+
+        <!-- Circular countdown widget -->
+        <div class="countdown-widget" aria-label="Time remaining">
+          <div class="countdown-circle-wrap">
+            <svg class="countdown-ring" viewBox="0 0 160 160" aria-hidden="true">
+              <circle class="countdown-ring__bg" cx="80" cy="80" r="70"/>
+              <circle
+                id="countdown-ring-fg"
+                class="countdown-ring__fg"
+                cx="80" cy="80" r="70"
+              />
+            </svg>
+            <div class="countdown-center">
+              <span class="countdown-time" id="countdown-time-display" aria-live="off" aria-atomic="true">--:--</span>
+              <span class="countdown-time-label">remaining</span>
+            </div>
+          </div>
+          <p class="countdown-subtitle" id="countdown-subtitle">
+            Tap Pause to freeze your time
+          </p>
+        </div>
+
+        <!-- Session details -->
+        <dl class="session-details" id="session-details">
+          <div class="session-detail-row">
+            <dt>Session ID</dt>
+            <dd id="detail-session-id">—</dd>
+          </div>
+          <div class="session-detail-row">
+            <dt>Started</dt>
+            <dd id="detail-started">—</dd>
+          </div>
+          <div class="session-detail-row">
+            <dt>Expires</dt>
+            <dd id="detail-expires">—</dd>
+          </div>
+          <div class="session-detail-row">
+            <dt>Plan</dt>
+            <dd id="detail-plan">—</dd>
+          </div>
+        </dl>
+
+        <!-- Pause / Resume controls -->
+        <div id="controls-section" class="controls-section">
+          <button
+            type="button"
+            id="btn-pause"
+            class="btn btn--secondary btn--full"
+            aria-describedby="pause-hint"
+          >
+            <svg class="btn-icon btn-icon--left" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="6" y="4" width="4" height="16"/>
+              <rect x="14" y="4" width="4" height="16"/>
+            </svg>
+            <span id="pause-label">Pause Session</span>
+          </button>
+          <p id="pause-hint" class="form-hint form-hint--centered">
+            Freezes your remaining time. Useful during meals or when stepping away.
+          </p>
+        </div>
+
+        <!-- Pause confirmation dialog -->
+        <div id="pause-confirm" class="confirm-dialog hidden" role="dialog" aria-labelledby="pause-confirm-heading">
+          <h3 id="pause-confirm-heading">Pause your session?</h3>
+          <p>Your remaining time will be saved. You can resume at any time.</p>
+          <div class="confirm-actions">
+            <button type="button" id="btn-pause-confirm" class="btn btn--primary">Yes, pause</button>
+            <button type="button" id="btn-pause-cancel" class="btn btn--outline">Cancel</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Paused state -->
+      <section id="session-paused" class="status-card status-card--paused hidden" aria-labelledby="paused-heading" aria-live="assertive">
+        <h2 id="paused-heading" class="card-title card-title--status card-title--paused">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="14" y="4" width="4" height="16" rx="1" fill="#b45309"/>
+            <rect x="6" y="4" width="4" height="16" rx="1" fill="#b45309"/>
+          </svg>
+          Session Paused
+        </h2>
+        <p class="card-subtitle">Your session timer is frozen. Tap Resume to continue.</p>
+        <div class="countdown-widget">
+          <div class="countdown-circle-wrap">
+            <svg class="countdown-ring" viewBox="0 0 160 160" aria-hidden="true">
+              <circle class="countdown-ring__bg" cx="80" cy="80" r="70"/>
+              <circle
+                id="paused-ring-fg"
+                class="countdown-ring__fg"
+                cx="80" cy="80" r="70"
+                style="stroke: var(--warning-border);"
+              />
+            </svg>
+            <div class="countdown-center">
+              <span class="countdown-time" id="paused-time-display">--:--</span>
+              <span class="countdown-time-label">frozen</span>
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          id="btn-resume"
+          class="btn btn--primary btn--full"
+          style="margin-top: 4px;"
+        >
+          <svg class="btn-icon btn-icon--left" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Resume Session
+        </button>
+      </section>
+
+      <!-- Expired state -->
+      <section id="session-expired" class="status-card status-card--expired hidden" aria-labelledby="expired-heading" aria-live="assertive">
+        <div class="error-icon" aria-hidden="true">
+          <svg width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="28" cy="28" r="26" fill="#fff0ed" stroke="#c0392b" stroke-width="2.5"/>
+            <line x1="18" y1="18" x2="38" y2="38" stroke="#c0392b" stroke-width="3" stroke-linecap="round"/>
+            <line x1="38" y1="18" x2="18" y2="38" stroke="#c0392b" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h2 id="expired-heading" class="card-title card-title--error">Session Expired</h2>
+        <p class="card-subtitle">Your WiFi session has ended. Purchase a new session or enter a voucher to reconnect.</p>
+        <a href="index.html" class="btn btn--primary btn--full" role="button">
+          Return to Login
+        </a>
+      </section>
+
+      <!-- Unknown state -->
+      <section id="session-unknown" class="status-card hidden" aria-labelledby="unknown-heading" aria-live="polite">
+        <h2 id="unknown-heading" class="card-title">Session Not Found</h2>
+        <p class="card-subtitle">We could not find an active session for this device. This may happen if you connected before this feature was enabled.</p>
+        <a href="index.html" class="btn btn--primary btn--full" role="button">
+          Return to Login
+        </a>
+      </section>
+
+      <!-- Status refresh footer -->
+      <div class="status-footer">
+        <p id="last-updated" class="last-updated">Last updated: —</p>
+        <p id="polling-status" class="polling-status" aria-live="polite"></p>
+      </div>
+
+      <footer class="portal-footer" role="contentinfo">
+        <p class="support-info">
+          Need help?
+          <a href="mailto:support@example.com" class="support-link">Contact support</a>
+        </p>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    /* ============================================================
+       status.html — Session status polling and countdown
+       Backend enforces expiration. This page only DISPLAYS state.
+       ============================================================ */
+    (function () {
+      'use strict';
+
+      // ---- Config ----
+      var CONFIG = window.CONFIG || {};
+      var API_BASE = CONFIG.apiBaseUrl || '';
+      var POLL_INTERVAL = CONFIG.statusPollingInterval || 30000;
+      var SESSION_ID = '';
+
+      // ---- Ring circumference for the SVG circle ----
+      var RING_R = 70;
+      var RING_CIRC = 2 * Math.PI * RING_R; // ~439.8
+
+      // ---- DOM refs ----
+      var $ = function (id) { return document.getElementById(id); };
+      var els = {
+        loading:      $('loading-state'),
+        active:       $('session-active'),
+        paused:       $('session-paused'),
+        expired:      $('session-expired'),
+        unknown:      $('session-unknown'),
+        cdTime:       $('countdown-time-display'),
+        cdRing:       $('countdown-ring-fg'),
+        pausedTime:   $('paused-time-display'),
+        pausedRing:   $('paused-ring-fg'),
+        subtitle:     $('countdown-subtitle'),
+        detailSid:    $('detail-session-id'),
+        detailStart:  $('detail-started'),
+        detailExpiry: $('detail-expires'),
+        detailPlan:   $('detail-plan'),
+        btnPause:     $('btn-pause'),
+        pauseConfirm: $('pause-confirm'),
+        btnPauseConfirm: $('btn-pause-confirm'),
+        btnPauseCancel:  $('btn-pause-cancel'),
+        btnResume:    $('btn-resume'),
+        controls:     $('controls-section'),
+        lastUpdated:  $('last-updated'),
+        pollingStatus: $('polling-status'),
+        pauseLabel:   $('pause-label'),
+        pauseHint:    $('pause-hint'),
+      };
+
+      var pollTimer = null;
+      var countdownTimer = null;
+      var localSeconds = null;
+      var totalSeconds = null;   // used to calculate ring fill ratio
+
+      // ---- Helpers ----
+      function pad(n) { return String(n).padStart(2, '0'); }
+
+      function formatDuration(totalSecs) {
+        if (totalSecs == null || totalSecs < 0) return '--:--';
+        var h = Math.floor(totalSecs / 3600);
+        var m = Math.floor((totalSecs % 3600) / 60);
+        var s = totalSecs % 60;
+        if (h > 0) return pad(h) + ':' + pad(m) + ':' + pad(s);
+        return pad(m) + ':' + pad(s);
+      }
+
+      function formatDate(iso) {
+        try {
+          var d = new Date(iso);
+          return d.toLocaleString();
+        } catch (e) { return iso || '—'; }
+      }
+
+      // Update the SVG ring fill based on remaining/total ratio
+      function updateRing(ring, remaining, total) {
+        if (!ring) return;
+        var ratio = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0;
+        var offset = RING_CIRC * (1 - ratio);
+        ring.style.strokeDasharray = RING_CIRC.toFixed(1);
+        ring.style.strokeDashoffset = offset.toFixed(1);
+
+        // Colour: green → amber → red as time runs low
+        ring.classList.remove('is-warning', 'is-critical');
+        if (ratio <= 0.15) {
+          ring.classList.add('is-critical');
+        } else if (ratio <= 0.30) {
+          ring.classList.add('is-warning');
+        }
+      }
+
+      function showSection(name) {
+        [els.loading, els.active, els.paused, els.expired, els.unknown]
+          .forEach(function (el) { if (el) el.classList.add('hidden'); });
+        var map = { loading: els.loading, active: els.active, paused: els.paused,
+                    expired: els.expired, unknown: els.unknown };
+        if (map[name]) map[name].classList.remove('hidden');
+      }
+
+      function updateCountdownDisplay(totalSecs) {
+        localSeconds = Math.max(0, Math.floor(totalSecs));
+        var timeStr = formatDuration(localSeconds);
+        if (els.cdTime) els.cdTime.textContent = timeStr;
+        updateRing(els.cdRing, localSeconds, totalSeconds);
+      }
+
+      function tickCountdown() {
+        if (localSeconds === null || localSeconds <= 0) return;
+        localSeconds--;
+        updateCountdownDisplay(localSeconds);
+        if (localSeconds <= 0) {
+          clearInterval(countdownTimer);
+          fetchStatus();
+        }
+      }
+
+      function startCountdownTick() {
+        clearInterval(countdownTimer);
+        countdownTimer = setInterval(tickCountdown, 1000);
+      }
+
+      // ---- API calls ----
+      function fetchStatus() {
+        if (!SESSION_ID) return;
+        var url = API_BASE + '/api/session/status?sessionId=' + encodeURIComponent(SESSION_ID);
+        fetch(url, { method: 'GET', cache: 'no-store' })
+          .then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
+          .then(renderStatus)
+          .catch(function (err) {
+            console.warn('Session status fetch failed:', err.message);
+            showSection('unknown');
+          });
+      }
+
+      function doPause() {
+        var url = API_BASE + '/api/session/pause';
+        return fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: SESSION_ID }),
+        }).then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        });
+      }
+
+      function doResume() {
+        var url = API_BASE + '/api/session/resume';
+        return fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: SESSION_ID }),
+        }).then(function (r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        });
+      }
+
+      // ---- Render ----
+      function renderStatus(data) {
+        if (els.lastUpdated) {
+          els.lastUpdated.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+        }
+
+        if (!data || !data.sessionId) {
+          showSection('unknown');
+          return;
+        }
+
+        var state = data.state || 'unknown';
+        SESSION_ID = data.sessionId;
+
+        if (els.detailSid)    els.detailSid.textContent    = data.sessionId || '—';
+        if (els.detailStart) els.detailStart.textContent  = formatDate(data.startedAt);
+        if (els.detailExpiry) els.detailExpiry.textContent = formatDate(data.expiresAt);
+        if (els.detailPlan)   els.detailPlan.textContent   = data.plan ? data.plan + ' min' : '—';
+
+        if (state === 'active') {
+          showSection('active');
+          localSeconds = Math.floor(data.remainingSeconds || 0);
+          totalSeconds = localSeconds; // treat first value as 100% for ring
+          updateCountdownDisplay(localSeconds);
+          startCountdownTick();
+          if (CONFIG.showPauseResume && data.canPause !== false) {
+            if (els.controls) els.controls.classList.remove('hidden');
+            if (els.btnPause) els.btnPause.disabled = false;
+          }
+        } else if (state === 'paused') {
+          showSection('paused');
+          clearInterval(countdownTimer);
+          var pausedSecs = Math.floor(data.remainingSeconds || 0);
+          if (els.pausedTime) els.pausedTime.textContent = formatDuration(pausedSecs);
+          updateRing(els.pausedRing, pausedSecs, pausedSecs || 1);
+        } else if (state === 'expired') {
+          showSection('expired');
+          clearInterval(countdownTimer);
+          localSeconds = 0;
+        } else {
+          showSection('unknown');
+        }
+
+        clearTimeout(pollTimer);
+        pollTimer = setTimeout(fetchStatus, POLL_INTERVAL);
+      }
+
+      // ---- Event handlers ----
+      if (els.btnPause) {
+        els.btnPause.addEventListener('click', function () {
+          if (els.controls) els.controls.classList.add('hidden');
+          if (els.pauseConfirm) els.pauseConfirm.classList.remove('hidden');
+        });
+      }
+
+      if (els.btnPauseConfirm) {
+        els.btnPauseConfirm.addEventListener('click', function () {
+          els.btnPauseConfirm.disabled = true;
+          els.btnPauseCancel.disabled = true;
+          if (els.pollingStatus) els.pollingStatus.textContent = 'Pausing session…';
+          doPause()
+            .then(function (data) {
+              if (els.pollingStatus) els.pollingStatus.textContent = '';
+              renderStatus(data);
+            })
+            .catch(function (err) {
+              if (els.pollingStatus) els.pollingStatus.textContent = 'Failed to pause. Please try again.';
+              if (els.btnPauseConfirm) els.btnPauseConfirm.disabled = false;
+              if (els.btnPauseCancel) els.btnPauseCancel.disabled = false;
+              if (els.pauseConfirm) els.pauseConfirm.classList.add('hidden');
+              if (els.controls) els.controls.classList.remove('hidden');
+            });
+        });
+      }
+
+      if (els.btnPauseCancel) {
+        els.btnPauseCancel.addEventListener('click', function () {
+          if (els.pauseConfirm) els.pauseConfirm.classList.add('hidden');
+          if (els.controls) els.controls.classList.remove('hidden');
+        });
+      }
+
+      if (els.btnResume) {
+        els.btnResume.addEventListener('click', function () {
+          els.btnResume.disabled = true;
+          if (els.pollingStatus) els.pollingStatus.textContent = 'Resuming session…';
+          doResume()
+            .then(function (data) {
+              if (els.pollingStatus) els.pollingStatus.textContent = '';
+              renderStatus(data);
+            })
+            .catch(function (err) {
+              if (els.pollingStatus) els.pollingStatus.textContent = 'Failed to resume. Please try again.';
+              els.btnResume.disabled = false;
+            });
+        });
+      }
+
+      // ---- Init ----
+      var params = new URLSearchParams(window.location.search);
+      SESSION_ID = params.get('sessionId') || CONFIG.sessionId || '';
+
+      if (SESSION_ID) {
+        showSection('loading');
+        fetchStatus();
+      } else {
+        showSection('unknown');
+      }
+
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+          clearTimeout(pollTimer);
+          clearInterval(countdownTimer);
+        } else {
+          fetchStatus();
+        }
+      });
+
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2d6a4f">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>WiFi Portal — Connect</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232d6a4f'/><path d='M6 22 Q16 10 26 22' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round'/><path d='M11 26 Q16 18 21 26' stroke='white' stroke-width='2' fill='none' stroke-linecap='round'/><circle cx='16' cy='29' r='1.5' fill='white'/></svg>">
+</head>
+<body>
+  <!-- Skip to main content -->
+  <a href="#main-form" class="skip-link">Skip to login form</a>
+
+  <div class="page-wrapper">
+    <!-- Header / Branding -->
+    <header class="portal-header" role="banner">
+      <div class="logo-container" aria-label="Network logo">
+        <svg class="logo-svg" width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="52" height="52" rx="14" fill="#2d6a4f"/>
+          <path d="M9 32 Q26 14 43 32" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M17 38 Q26 27 35 38" stroke="rgba(255,255,255,0.75)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <circle cx="26" cy="43" r="2.5" fill="white"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1 class="brand-name" id="brand-name">GoodVibesVendoWifi</h1>
+        <p class="brand-tagline" id="brand-tagline">Connect to our Guest Network</p>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="main-form" class="portal-main" role="main">
+
+      <noscript>
+        <div class="noscript-notice" role="alert">
+          <p><strong>JavaScript is disabled.</strong> Enter your voucher code below and click Submit to connect.</p>
+        </div>
+      </noscript>
+
+      <div id="status-banner" class="status-banner hidden" role="status" aria-live="polite"></div>
+
+      <!-- ================================================================
+           IMAGE CAROUSEL
+           ================================================================ -->
+      <div class="carousel" id="hero-carousel" aria-label="Featured images" role="region">
+        <div class="carousel__track">
+          <div class="carousel__slide">
+            <img
+              src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=900&q=80&auto=format&fit=crop"
+              alt="Tropical beach at golden hour"
+              loading="eager"
+            >
+            <div class="carousel__overlay">
+              <p class="carousel__caption">Welcome to Paradise</p>
+              <p class="carousel__subcaption">Enjoy seamless WiFi during your stay</p>
+            </div>
+          </div>
+          <div class="carousel__slide">
+            <img
+              src="https://images.unsplash.com/photo-1540206395-68808572332f?w=900&q=80&auto=format&fit=crop"
+              alt="Palm trees swaying in the breeze"
+              loading="lazy"
+            >
+            <div class="carousel__overlay">
+              <p class="carousel__caption">Stay Connected</p>
+              <p class="carousel__subcaption">Fast and reliable guest WiFi</p>
+            </div>
+          </div>
+          <div class="carousel__slide">
+            <img
+              src="https://images.unsplash.com/photo-1471922694854-ff1b63b20054?w=900&q=80&auto=format&fit=crop"
+              alt="Clear ocean water and island view"
+              loading="lazy"
+            >
+            <div class="carousel__overlay">
+              <p class="carousel__caption">Your Session, Your Time</p>
+              <p class="carousel__subcaption">Pause and resume anytime you need</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Arrow navigation -->
+        <button class="carousel__arrow carousel__arrow--prev" aria-label="Previous image">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5c3d11" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+        </button>
+        <button class="carousel__arrow carousel__arrow--next" aria-label="Next image">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5c3d11" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </button>
+
+        <!-- Dot indicators -->
+        <div class="carousel__dots" role="tablist" aria-label="Carousel navigation">
+          <button class="carousel__dot is-active" role="tab" aria-label="Slide 1" aria-selected="true"></button>
+          <button class="carousel__dot" role="tab" aria-label="Slide 2" aria-selected="false"></button>
+          <button class="carousel__dot" role="tab" aria-label="Slide 3" aria-selected="false"></button>
+        </div>
+      </div>
+
+      <!-- ================================================================
+           VOUCHER / ACCESS CODE SECTION
+           ================================================================ -->
+      <section class="login-card" aria-labelledby="form-heading">
+        <div class="card-header">
+          <h2 id="form-heading" class="card-title">Welcome</h2>
+          <p class="card-subtitle" id="card-subtitle">Enter your voucher or access code to connect</p>
+        </div>
+
+        <div id="loading-overlay" class="loading-overlay hidden" aria-hidden="true">
+          <div class="spinner" role="img" aria-label="Connecting, please wait"></div>
+          <p class="loading-text" id="loading-text">Connecting…</p>
+        </div>
+
+        <!-- Voucher / Access Code -->
+        <form
+          id="auth-form-backend"
+          class="auth-form"
+          novalidate
+          aria-label="WiFi authentication form"
+          data-mode="backend"
+        >
+          <div class="form-group">
+            <label for="voucher-input" class="form-label">
+              Voucher / Access Code
+              <span class="required-indicator" aria-hidden="true">*</span>
+            </label>
+            <div class="input-wrapper">
+              <svg class="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <input
+                type="text"
+                id="voucher-input"
+                name="voucher"
+                class="form-input"
+                placeholder="e.g. WIFI-ABCD-1234"
+                autocomplete="off"
+                autocapitalize="characters"
+                spellcheck="false"
+                minlength="1"
+                maxlength="32"
+                inputmode="text"
+                required
+                aria-required="true"
+                aria-describedby="voucher-hint voucher-error"
+              >
+              <button type="button" class="input-toggle" id="voucher-toggle" aria-label="Show voucher code" hidden>
+                <svg class="icon-show" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <svg class="icon-hide hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              </button>
+            </div>
+            <p id="voucher-hint" class="form-hint" aria-live="polite"></p>
+            <p id="voucher-error" class="form-error hidden" role="alert"></p>
+          </div>
+
+          <!-- Plan selector (paid mode) -->
+          <div id="plan-section" class="form-group hidden">
+            <label for="plan-select" class="form-label">Select Duration</label>
+            <select id="plan-select" class="form-select" name="plan" aria-describedby="plan-hint">
+              <option value="">— Choose a plan —</option>
+            </select>
+            <p id="plan-hint" class="form-hint">After payment you will be automatically connected.</p>
+          </div>
+
+          <!-- Terms -->
+          <div id="terms-section" class="form-group form-group--checkbox hidden">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                id="terms-checkbox"
+                name="terms"
+                class="checkbox-input"
+                required
+                aria-required="true"
+                aria-describedby="terms-error"
+              >
+              <span class="checkbox-custom" aria-hidden="true"></span>
+              <span class="checkbox-text">
+                I accept the
+                <a href="#" id="terms-link" class="terms-link" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                and
+                <a href="#" id="privacy-link" class="terms-link" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+              </span>
+            </label>
+            <p id="terms-error" class="form-error hidden" role="alert"></p>
+          </div>
+
+          <div id="form-error" class="form-error-box hidden" role="alert" aria-live="assertive"></div>
+
+          <button
+            type="submit"
+            id="submit-btn"
+            class="btn btn--primary btn--full"
+            aria-describedby="submit-hint"
+          >
+            <span id="submit-label">Connect Now</span>
+            <svg class="btn-icon btn-icon--right" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+          </button>
+          <p id="submit-hint" class="form-hint form-hint--centered">
+            By connecting, you agree to our acceptable use policy.
+          </p>
+        </form>
+      </section>
+
+      <!-- ================================================================
+           PAYMENT SECTION — always visible; plan selection happens inside
+           ================================================================ -->
+      <section id="payment-section" class="login-card" aria-labelledby="payment-heading">
+        <div class="card-header">
+          <h2 id="payment-heading" class="card-title">Buy a Plan</h2>
+          <p class="card-subtitle">Choose a payment method to purchase WiFi access</p>
+        </div>
+
+        <!-- OR divider -->
+        <div class="auth-divider" aria-hidden="true">or</div>
+
+        <div class="payment-section">
+          <div class="payment-tiles" role="group" aria-label="Payment methods">
+
+            <!-- GCash -->
+            <button
+              type="button"
+              class="payment-tile"
+              data-payment="gcash"
+              aria-label="Pay with GCash"
+            >
+              <div class="payment-tile__icon-wrap" aria-hidden="true">
+                <img
+                  class="payment-tile__logo"
+                  src="assets/images/gcash-logo.png"
+                  alt="GCash logo"
+                  onerror="this.style.display='none'"
+                >
+              </div>
+              <span class="payment-tile__name">GCash</span>
+            </button>
+
+            <!-- Maya -->
+            <button
+              type="button"
+              class="payment-tile"
+              data-payment="maya"
+              aria-label="Pay with Maya"
+            >
+              <div class="payment-tile__icon-wrap" aria-hidden="true">
+                <img
+                  class="payment-tile__logo"
+                  src="assets/images/maya-logo.png"
+                  alt="Maya logo"
+                  onerror="this.style.display='none'"
+                >
+              </div>
+              <span class="payment-tile__name">Maya</span>
+            </button>
+
+            <!-- ShopeePay -->
+            <button
+              type="button"
+              class="payment-tile"
+              data-payment="shopeepay"
+              aria-label="Pay with ShopeePay"
+            >
+              <div class="payment-tile__icon-wrap" aria-hidden="true">
+                <img
+                  class="payment-tile__logo"
+                  src="assets/images/shopeepay-logo.png"
+                  alt="ShopeePay logo"
+                  onerror="this.style.display='none'"
+                >
+              </div>
+              <span class="payment-tile__name">ShopeePay</span>
+            </button>
+
+            <!-- QR Ph -->
+            <button
+              type="button"
+              class="payment-tile"
+              data-payment="qrph"
+              aria-label="Pay with QR Ph"
+            >
+              <div class="payment-tile__icon-wrap" aria-hidden="true">
+                <img
+                  class="payment-tile__logo"
+                  src="assets/images/qrph-logo.png"
+                  alt="QR Ph logo"
+                  onerror="this.style.display='none'"
+                >
+              </div>
+              <span class="payment-tile__name">QR Ph</span>
+            </button>
+
+          </div><!-- /.payment-tiles -->
+        </div>
+      </section>
+
+      <!-- Support info -->
+      <footer class="portal-footer" role="contentinfo">
+        <p class="support-info" id="support-info">
+          Need help?
+          <a href="mailto:support@example.com" id="support-email" class="support-link">Contact support</a>
+        </p>
+        <p class="powered-by">Powered by Bukuhan WiFi Vendo</p>
+      </footer>
+
+    </main>
+  </div><!-- /.page-wrapper -->
+
+  <script src="assets/carousel.js"></script>
+  <script src="config/config.js"></script>
+  <script src="assets/portal.js"></script>
+  <script>
+    // Initialise carousel when DOM is ready
+    document.addEventListener('DOMContentLoaded', function () {
+      var carousel = new Carousel('#hero-carousel', { interval: 4500, autoplay: true });
+      carousel.start();
+      // Expose on window for debug / status page reuse
+      window.__portalCarousel = carousel;
+    });
+  </script>
+</body>
+</html>

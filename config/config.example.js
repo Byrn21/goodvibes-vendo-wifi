@@ -1,0 +1,184 @@
+/**
+ * config.js — Omada Captive Portal Frontend Configuration
+ *
+ * Copy this file to config/config.js (keep config.example.js as a template).
+ *
+ * SECRETS AND CREDENTIALS MUST NEVER BE PLACED IN THIS FILE.
+ * This file ships inside portal-upload.zip.
+ *
+ * Values marked ⚠️ MUST be verified against your specific controller firmware
+ * version before deployment. See README.md §Controller-Specific Values.
+ */
+
+(function () {
+  'use strict';
+
+  window.CONFIG = {
+
+    // ==============================================================
+    // BRANDING — Replace these with your organization's details
+    // ==============================================================
+    brandName: 'Hotel WiFi Portal',
+    brandTagline: 'Connect to our Guest Network',
+    // Path relative to index.html. Keep local — no external URLs.
+    logoUrl: 'assets/images/logo.svg',
+    // CSS color value (hex, rgb, hsl)
+    primaryColor: '#1a73e8',
+    accentColor: '#e8f0fe',
+    textColor: '#202124',
+    supportEmail: 'support@example.com',
+    supportPhone: '+1-555-0100',
+
+    // ==============================================================
+    // AUTHENTICATION MODE
+    // ==============================================================
+    // 'direct'  — Form POST directly to the Omada controller extPortal endpoint.
+    //              Works for free voucher mode without a backend.
+    //              ⚠️ CORS: Some Omada controllers block cross-origin POSTs.
+    //              Prefer 'backend' mode for reliable operation.
+    //
+    // 'backend' — JavaScript fetch() POST to your backend /api/auth.
+    //              Backend proxies to Omada. Supports paid sessions and
+    //              webhook-based payment flows.
+    mode: 'direct',
+
+    // ==============================================================
+    // DIRECT MODE (mode: 'direct')
+    // ⚠️ Verify every value in this section with your controller.
+    // ==============================================================
+
+    // The Omada controller's external portal authentication endpoint.
+    // Format: https://<controller-ip>:<port>/extPortal/auth
+    // Common ports: 8043 (HTTPS), 8080 (HTTP), 8043 (Omada app-based)
+    // ⚠️ Some controllers use /api/v2/extPortal/auth or /extPortal/auth.htm
+    authEndpoint: 'https://192.168.1.252:8043/extPortal/auth',
+
+    // HTTP method for the direct POST.
+    // 'POST' = application/x-www-form-urlencoded (most common)
+    // 'POST_JSON' = application/json (verify your controller supports this)
+    authMethod: 'POST',
+
+    // Fixed fields to include in the direct-mode POST body.
+    // ⚠️ These field NAMES vary by Omada version. Common alternatives:
+    //   username/password vs. token/mac vs. key/value vs. voucher/token
+    //   Always capture a real redirect request to confirm the exact field names.
+    authParams: {
+      username: 'voucher',   // maps voucher input → body[username]
+      password: 'voucher',  // maps voucher input → body[password]
+      // clientMac and clientIp are auto-included from query params
+      // Add any additional fixed fields your controller requires here
+    },
+
+    // ==============================================================
+    // BACKEND MODE (mode: 'backend')
+    // ==============================================================
+
+    // Base URL of your backend server (no trailing slash)
+    apiBaseUrl: 'https://api.your-domain.com',
+
+    // ==============================================================
+    // VOUCHER VALIDATION (frontend hints only — backend enforces)
+    // ==============================================================
+    voucher: {
+      required: true,
+      minLength: 8,
+      maxLength: 16,
+      // Allow letters, numbers, and common voucher separators
+      pattern: /^[A-Z0-9]+$/i,
+      patternHint: 'Letters and numbers only, 8–16 characters',
+    },
+
+    // ==============================================================
+    // REDIRECT ALLOWLIST
+    // After successful auth, users are redirected here.
+    // ⚠️ Must include any domains you want users to reach post-auth.
+    //    Empty array = allow any http/https URL (not recommended).
+    // ==============================================================
+    allowedRedirectDomains: [
+      'example.com',
+      'google.com',
+      'captive.apple.com',
+      'connectivitycheck.gstatic.com',
+      // Add your actual guest-facing domains here
+    ],
+
+    // Fallback destination if no original URL is captured.
+    // ⚠️ Must be a valid https:// URL or localhost for dev.
+    defaultRedirectUrl: 'https://www.example.com/welcome',
+
+    // ==============================================================
+    // TERMS AND CONDITIONS
+    // ==============================================================
+    termsRequired: false,
+    termsUrl: '#terms',
+    privacyUrl: '#privacy',
+
+    // ==============================================================
+    // STATUS PAGE
+    // ==============================================================
+    // How often status.html polls the backend for updates (milliseconds).
+    // This is display-only; the backend enforces session expiration.
+    statusPollingInterval: 30000,
+    // Show pause/resume controls (requires backend session management)
+    showPauseResume: true,
+
+    // ==============================================================
+    // CONTROLLER QUERY PARAMETER MAPPING
+    // ⚠️  These are the most common names. Your controller version may differ.
+    //      Inspect the actual redirect URL from your AP to confirm.
+    //
+    // Common variations:
+    //   clientMac  → mac, clientmac, usermac, client_mac
+    //   clientIp   → ip, clientip, userip, client_ip
+    //   apMac      → apmac, acmac, ap_mac
+    //   ssidName   → ssid, wlan, ssidname, wlan_name, WLANName
+    //   redirectUrl→ redirect, url, target, dst, go, targetUrl, u
+    //   Controller-specific tokens may appear as: token, ap_session, sessid, sid
+    // ==============================================================
+    paramMap: {
+      // Our canonical name → Omada parameter name
+      clientMac:   'clientMac',
+      clientIp:    'clientIp',
+      apMac:       'apMac',
+      ssidName:    'ssidName',
+      redirectUrl: 'redirectUrl',
+      originalUrl: 'originalUrl',
+      authUrl:     'authUrl',
+      targetUrl:   'targetUrl',
+      // Uncomment and adjust if your controller uses different names:
+      // clientMac:   'mac',
+      // redirectUrl: 'url',
+      // ssidName:    'ssid',
+    },
+
+    // ==============================================================
+    // PAID SESSION PLANS (backend mode only)
+    // Uncomment and configure when using paid Wi-Fi.
+    // Each plan: { duration: minutes, price: smallest currency unit, label: 'human label' }
+    // Example: price 5000 = 50.00 of your currency
+    // ==============================================================
+    // plans: [
+    //   { duration: 60,  price: 5000,  label: '1 Hour'    },
+    //   { duration: 180, price: 12000, label: '3 Hours'   },
+    //   { duration: 1440, price: 25000, label: '24 Hours' },
+    // ],
+
+    // ==============================================================
+    // DEVELOPMENT / TESTING
+    // ==============================================================
+    // Set to true to simulate authentication without a live controller.
+    // NEVER enable mockMode in production.
+    mockMode: false,
+    // Delay (ms) before mock auth resolves
+    mockSuccessDelay: 800,
+
+    // ==============================================================
+    // PAGE ROUTES — change if you rename the HTML files
+    // ==============================================================
+    successPage: 'success.html',
+    errorPage:   'error.html',
+    statusPage:  'status.html',
+
+  };
+
+})();

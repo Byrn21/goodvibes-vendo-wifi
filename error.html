@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#c0392b">
+  <title>Connection Failed — WiFi Portal</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <header class="portal-header portal-header--error" role="banner">
+      <div class="logo-container">
+        <svg class="logo-svg" width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="52" height="52" rx="14" fill="#c0392b"/>
+          <line x1="17" y1="17" x2="35" y2="35" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+          <line x1="35" y1="17" x2="17" y2="35" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1 class="brand-name" id="brand-name">Bukuhan WiFi</h1>
+        <p class="brand-tagline" id="brand-tagline">Connection issue</p>
+      </div>
+    </header>
+
+    <main class="portal-main" role="main">
+      <section class="error-card" aria-labelledby="error-heading">
+        <div class="error-icon" aria-hidden="true">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="32" cy="32" r="30" fill="#fce8e6" stroke="#d93025" stroke-width="3"/>
+            <line x1="22" y1="22" x2="42" y2="42" stroke="#d93025" stroke-width="4" stroke-linecap="round"/>
+            <line x1="42" y1="22" x2="22" y2="42" stroke="#d93025" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+        </div>
+
+        <h2 id="error-heading" class="card-title card-title--error">Authentication Failed</h2>
+
+        <!-- Dynamic error message injected by JS -->
+        <p class="card-subtitle" id="error-message">
+          We could not verify your credentials. Please try again.
+        </p>
+
+        <!-- Error code for support (no internal details) -->
+        <div id="error-code-section" class="error-code-box hidden">
+          <p class="error-code-label">Error reference</p>
+          <p class="error-code-value" id="error-code-value" aria-live="polite">—</p>
+        </div>
+
+        <div id="retry-notice" class="retry-notice">
+          <p>Redirecting back to the login in <span id="retry-countdown" aria-live="polite">10</span> seconds…</p>
+          <a href="index.html" id="retry-btn" class="btn btn--primary btn--full" role="button">
+            <svg class="btn-icon btn-icon--left" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+              <path d="M3 3v5h5"/>
+            </svg>
+            Try Again
+          </a>
+        </div>
+      </section>
+
+      <!-- Troubleshooting tips -->
+      <section class="troubleshoot-card" aria-labelledby="troubleshoot-heading">
+        <h3 id="troubleshoot-heading" class="troubleshoot-title">Common Solutions</h3>
+        <ul class="troubleshoot-list" role="list">
+          <li>
+            <strong>Check your voucher code</strong> — verify letters and numbers match exactly.
+          </li>
+          <li>
+            <strong>Voucher may be expired or used</strong> — contact the front desk for a new code.
+          </li>
+          <li>
+            <strong>Network conditions</strong> — move closer to the access point and retry.
+          </li>
+          <li>
+            <strong>Session already active</strong> — if already connected, you may need to disconnect first.
+          </li>
+        </ul>
+        <div class="support-cta" id="support-cta">
+          <p>Still not working?
+            <a href="mailto:support@example.com" class="support-link" id="support-email">
+              Contact support
+            </a>
+          </p>
+        </div>
+      </section>
+
+      <footer class="portal-footer" role="contentinfo">
+        <p class="support-info">
+          Need help?
+          <a href="mailto:support@example.com" class="support-link">Contact support</a>
+        </p>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Error display: reads ?message= and ?code= from URL -->
+  <!-- Internal details (tokens, stack traces) are NEVER shown to users -->
+  <script>
+    (function () {
+      'use strict';
+      var params = new URLSearchParams(window.location.search);
+      var message = params.get('message');
+      var code = params.get('code');
+      var retrySecs = parseInt(params.get('retry') || '10', 10);
+
+      // Public error messages only — no raw controller responses
+      var PUBLIC_MESSAGES = {
+        INVALID_VOUCHER: 'Your voucher code was not recognized. Please check and try again.',
+        EXPIRED_VOUCHER: 'This voucher has expired. Please obtain a new code.',
+        USED_VOUCHER: 'This voucher has already been used. Each code is for single use.',
+        SESSION_LIMIT: 'The maximum number of connected devices has been reached.',
+        NETWORK_ERROR: 'The network could not be reached. Please check your connection and try again.',
+        SERVER_ERROR: 'The authentication server is temporarily unavailable. Please try again shortly.',
+        PAYMENT_FAILED: 'Payment could not be processed. Please try again or contact support.',
+        TERMS_REQUIRED: 'You must accept the terms before connecting.',
+        RATE_LIMITED: 'Too many attempts. Please wait a moment before trying again.',
+      };
+
+      var msgEl = document.getElementById('error-message');
+      if (message && PUBLIC_MESSAGES[message]) {
+        msgEl.textContent = PUBLIC_MESSAGES[message];
+      } else if (message) {
+        msgEl.textContent = 'Authentication failed. Please check your voucher and try again.';
+      }
+
+      var codeSection = document.getElementById('error-code-section');
+      var codeValue = document.getElementById('error-code-value');
+      if (code && PUBLIC_MESSAGES[code]) {
+        codeSection.classList.remove('hidden');
+        codeValue.textContent = code;
+      }
+
+      var count = retrySecs;
+      var display = document.getElementById('retry-countdown');
+      var tid = setInterval(function () {
+        count--;
+        if (display) display.textContent = count;
+        if (count <= 0) {
+          clearInterval(tid);
+          window.location.href = 'index.html';
+        }
+      }, 1000);
+    })();
+  </script>
+</body>
+</html>
