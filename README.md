@@ -10,12 +10,11 @@ A production-ready, mobile-first HTML captive login portal for TP-Link Omada EAP
 4. [Configuration Reference](#configuration-reference)
 5. [Omada Controller Setup](#omada-controller-setup)
 6. [Walled Garden Configuration](#walled-garden-configuration)
-7. [Payment Integration](#payment-integration)
-8. [Backend API Reference](#backend-api-reference)
-9. [Testing](#testing)
-10. [Troubleshooting](#troubleshooting)
-11. [Security Checklist](#security-checklist)
-12. [Controller-Specific Values to Verify](#controller-specific-values-to-verify)
+7. [Backend API Reference](#backend-api-reference)
+8. [Testing](#testing)
+9. [Troubleshooting](#troubleshooting)
+10. [Security Checklist](#security-checklist)
+11. [Controller-Specific Values to Verify](#controller-specific-values-to-verify)
 
 ---
 
@@ -32,19 +31,18 @@ A production-ready, mobile-first HTML captive login portal for TP-Link Omada EAP
         |         (free voucher mode, no backend required)
         |
         +--> [Option B: Backend Proxy] POST /api/auth
-                  |          (paid + voucher mode)
+                  |          (voucher mode)
                   +--> Omada extPortal/auth
-                  +--> Payment Provider (PayMongo/Xendit)
-                  +--> SQLite/PostgreSQL session DB
+                  +--> SQLite session DB
                   +--> /status.html (countdown + pause/resume)
 ```
 
 **Two operating modes:**
 
-| Mode | Backend | Payment | Session Timer |
-|---|---|---|---|
-| Free Voucher | Not required | No | Omada enforces |
-| Paid / Managed | Required (Node.js) | Yes | Backend enforces |
+| Mode | Backend | Session Timer |
+|---|---|---|
+| Free Voucher | Not required | Omada enforces |
+| Managed (voucher) | Required (Node.js) | Backend enforces |
 
 ---
 
@@ -71,11 +69,9 @@ omada-captive-portal/
 │       ├── server.js        # Express server entry
 │       ├── routes/
 │       │   ├── auth.js      # POST /api/auth
-│       │   ├── payment.js   # POST /api/payment/create, POST /api/payment/webhook
 │       │   └── session.js   # GET /api/session/status, POST pause/resume/expire
 │       ├── services/
 │       │   ├── omada.js     # Omada controller adapter
-│       │   ├── payment.js   # Payment provider adapter
 │       │   └── session.js   # Session state machine
 │       └── db/
 │           └── schema.sql   # Database schema
@@ -221,13 +217,6 @@ DATABASE_URL=sqlite:./data/portal.db
 # For PostgreSQL:
 # DATABASE_URL=postgresql://user:pass@localhost:5432/portal
 
-# === Payment Provider (PayMongo example) ===
-PAYMENT_PROVIDER=paymock   # 'paymock' = mock adapter for testing
-PAYMONGO_SECRET_KEY=sk_test_your_key
-PAYMONGO_WEBHOOK_SECRET=whsec_your_secret
-PAYMENT_BASE_URL=https://api.paymongo.com
-PAYMENT_CHECKOUT_URL=https://checkout.paymongo.com
-
 # === Session Defaults ===
 SESSION_DURATION_OPTIONS=[60,120,180,360,720,1440]  # minutes
 DEFAULT_SESSION_DURATION=60
@@ -267,9 +256,6 @@ Allow access **before authentication** to:
 |---|---|
 | Portal frontend | `portal.your-domain.com` |
 | Backend API | `api.your-domain.com` |
-| Payment checkout | `checkout.paymongo.com` (or your provider) |
-| Payment provider API | `api.paymongo.com` |
-| Payment webhook backend | `api.your-domain.com/api/payment/webhook` |
 
 ### 3. Capture Query Parameters
 
@@ -311,40 +297,7 @@ In the Omada Controller, go to **Settings → WLAN → Walled Garden** and add:
 ```
 portal.your-domain.com
 api.your-domain.com
-checkout.paymongo.com
-api.paymongo.com
 ```
-
-> **Important**: The payment webhook endpoint (`/api/payment/webhook`) must be reachable from the public internet for the payment provider to send events to your backend. This does NOT require the client device to access it — it is a server-to-server call.
-
----
-
-## Payment Integration
-
-### Flow
-
-```
-1. Client selects plan → frontend POST /api/payment/create
-2. Backend creates checkout session with payment provider
-3. Backend returns checkout URL to frontend
-4. Frontend redirects client to checkout URL
-5. Payment provider processes payment
-6. Payment provider POSTs webhook to /api/payment/webhook
-7. Backend verifies webhook signature
-8. Backend authenticates client via Omada extPortal
-9. Backend stores session in database
-10. Client is redirected to /success.html or /status.html
-```
-
-### Supported Providers
-
-The adapter in `backend/src/services/payment.js` currently supports:
-
-- **Mock** (`paymock`): For local development and testing — generates fake successful payments immediately.
-- **PayMongo** (`paymongo`): [paymongo.com](https://paymongo.com) — Philippine payment gateway.
-- **Xendit** (`xendit`): [xendit.co](https://xendit.co) — Southeast Asian payment gateway.
-
-To add a new provider, implement `createCheckout()`, `verifyWebhook()`, and `handleEvent()` in `services/payment.js`.
 
 ---
 
@@ -388,54 +341,6 @@ Authenticate a client via Omada.
 
 ---
 
-### `POST /api/payment/create`
-
-Create a paid session checkout.
-
-**Request:**
-```json
-{
-  "plan": "120",
-  "clientMac": "aa:bb:cc:dd:ee:ff",
-  "clientIp": "192.168.1.105",
-  "apMac": "00:11:22:33:44:55",
-  "ssidName": "HotelGuest",
-  "redirectUrl": "https://www.google.com"
-}
-```
-
-**Response (success, 200):**
-```json
-{
-  "checkoutUrl": "https://checkout.paymongo.com/sess_xxx",
-  "sessionId": "sess_abc123"
-}
-```
-
----
-
-### `POST /api/payment/webhook`
-
-Payment provider webhook receiver. **No authentication** (uses signature verification).
-
-**PayMongo event example:**
-```json
-{
-  "data": {
-    "id": "evt_xxx",
-    "attributes": {
-      "type": "payment.paid",
-      "livemode": false,
-      "created_at": 1234567890,
-      "data": { "object": { "id": "pi_xxx", "amount": 5000 } },
-      "metadata": { "sessionId": "sess_abc123" }
-    }
-  }
-}
-```
-
----
-
 ### `GET /api/session/status`
 
 Poll session remaining time.
@@ -450,7 +355,6 @@ Poll session remaining time.
   "remainingSeconds": 4523,
   "startedAt": "2026-09-24T10:00:00Z",
   "expiresAt": "2026-09-24T12:00:00Z",
-  "plan": "120",
   "totalSeconds": 7200,
   "canPause": true,
   "canResume": false
@@ -513,7 +417,6 @@ npm test
 Tests cover:
 - `portal.js`: query param parsing, voucher validation, redirect allowlist, duplicate submission prevention
 - `session.js`: pause/resume state machine, expiration math, countdown
-- `payment.js`: webhook signature verification, duplicate event handling
 - `omada.js`: error handling, timeout behavior
 
 ### End-to-End (with live controller)
@@ -524,7 +427,6 @@ Tests cover:
 4. Connect a test device to the SSID.
 5. Observe redirect, capture parameters, update `config.js`.
 6. Submit a real voucher.
-7. For paid mode: trigger a test webhook from the payment dashboard.
 
 ---
 
@@ -549,11 +451,6 @@ Tests cover:
   - Wrong token format in Authorization header
   - Self-signed cert on controller not trusted
 
-### Payment Webhook Not Received
-
-- **Cause**: Webhook URL not publicly accessible, wrong secret, or provider not in live mode.
-- **Fix**: Use `stripe-cli` (for Stripe) or your provider's webhook testing tool. Check server logs for received events.
-
 ### Session Not Expiring
 
 - **Cause**: Browser countdown is display-only; backend must enforce expiration.
@@ -573,8 +470,6 @@ Before deploying to production:
 - [ ] HTTPS is enabled on both portal and backend (no HTTP in production)
 - [ ] Self-signed certificates are NOT used for production (use Let's Encrypt or cloud-managed certs)
 - [ ] `OMADA_API_TOKEN` is stored in `.env`, not in frontend files
-- [ ] Payment provider keys are in `.env`, not in frontend files
-- [ ] Webhook endpoints verify provider signatures
 - [ ] Database uses parameterized queries (no raw string interpolation)
 - [ ] CORS is restricted to the known portal origin
 - [ ] Rate limiting is enabled on public endpoints
@@ -585,7 +480,6 @@ Before deploying to production:
 - [ ] Redirect URLs are validated against an allowlist (no open redirects)
 - [ ] Generic error messages shown to users (no stack traces, no internal paths)
 - [ ] Server-side session expiration is implemented (not browser-only)
-- [ ] Idempotency keys used for payment webhook handling
 
 ---
 

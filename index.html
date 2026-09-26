@@ -164,15 +164,6 @@
             <p id="voucher-error" class="form-error hidden" role="alert"></p>
           </div>
 
-          <!-- Plan selector (paid mode) -->
-          <div id="plan-section" class="form-group hidden">
-            <label for="plan-select" class="form-label">Select Duration</label>
-            <select id="plan-select" class="form-select" name="plan" aria-describedby="plan-hint">
-              <option value="">— Choose a plan —</option>
-            </select>
-            <p id="plan-hint" class="form-hint">After payment you will be automatically connected.</p>
-          </div>
-
           <!-- Terms -->
           <div id="terms-section" class="form-group form-group--checkbox hidden">
             <label class="checkbox-label">
@@ -215,98 +206,6 @@
         </form>
       </section>
 
-      <!-- ================================================================
-           PAYMENT SECTION — always visible; plan selection happens inside
-           ================================================================ -->
-      <section id="payment-section" class="login-card" aria-labelledby="payment-heading">
-        <div class="card-header">
-          <h2 id="payment-heading" class="card-title">Buy a Plan</h2>
-          <p class="card-subtitle">Choose a payment method to purchase WiFi access</p>
-        </div>
-
-        <!-- OR divider -->
-        <div class="auth-divider" aria-hidden="true">or</div>
-
-        <div class="payment-section">
-          <div class="payment-tiles" role="group" aria-label="Payment methods">
-
-            <!-- GCash -->
-            <button
-              type="button"
-              class="payment-tile"
-              data-payment="gcash"
-              aria-label="Pay with GCash"
-            >
-              <div class="payment-tile__icon-wrap" aria-hidden="true">
-                <img
-                  class="payment-tile__logo"
-                  src="assets/images/gcash-logo.png"
-                  alt="GCash logo"
-                  onerror="this.style.display='none'"
-                >
-              </div>
-              <span class="payment-tile__name">GCash</span>
-            </button>
-
-            <!-- Maya -->
-            <button
-              type="button"
-              class="payment-tile"
-              data-payment="maya"
-              aria-label="Pay with Maya"
-            >
-              <div class="payment-tile__icon-wrap" aria-hidden="true">
-                <img
-                  class="payment-tile__logo"
-                  src="assets/images/maya-logo.png"
-                  alt="Maya logo"
-                  onerror="this.style.display='none'"
-                >
-              </div>
-              <span class="payment-tile__name">Maya</span>
-            </button>
-
-            <!-- ShopeePay -->
-            <button
-              type="button"
-              class="payment-tile"
-              data-payment="shopeepay"
-              aria-label="Pay with ShopeePay"
-            >
-              <div class="payment-tile__icon-wrap" aria-hidden="true">
-                <img
-                  class="payment-tile__logo"
-                  src="assets/images/shopeepay-logo.png"
-                  alt="ShopeePay logo"
-                  onerror="this.style.display='none'"
-                >
-              </div>
-              <span class="payment-tile__name">ShopeePay</span>
-            </button>
-
-            <!-- QR Ph -->
-            <button
-              type="button"
-              class="payment-tile"
-              data-payment="qrph"
-              aria-label="Pay with QR Ph"
-            >
-              <div class="payment-tile__icon-wrap" aria-hidden="true">
-                <img
-                  class="payment-tile__logo"
-                  src="assets/images/qrph-logo.png"
-                  alt="QR Ph logo"
-                  onerror="this.style.display='none'"
-                >
-              </div>
-              <span class="payment-tile__name">QR Ph</span>
-            </button>
-
-          </div><!-- /.payment-tiles -->
-        </div>
-      </section>
-
-      <!-- Support info -->
       <footer class="portal-footer" role="contentinfo">
         <p class="support-info" id="support-info">
           Need help?

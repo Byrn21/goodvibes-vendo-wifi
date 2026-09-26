@@ -3,19 +3,16 @@
  *
  * Flow:
  *   1. Validate input (voucher, client context)
- *   2. Validate voucher against database (free) or mark paid session (paid)
+ *   2. Validate voucher against database
  *   3. Call Omada extPortal/auth via omadaService
  *   4. Store session in DB
  *   5. Return success + redirect URL to frontend
- *
- * If payment is required, returns { checkoutUrl } instead.
  */
 
 const express = require('express');
 const router = express.Router();
 const omadaService = require('../services/omada');
 const { validateVoucher, recordSession } = require('../services/session');
-const { createPaymentCheckout } = require('../services/payment');
 const { v4: uuidv4 } = require('uuid');
 
 // POST /api/auth
@@ -29,7 +26,6 @@ router.post('/', async (req, res, next) => {
       ssidName,
       redirectUrl,
       termsAccepted,
-      plan,         // duration in minutes (if paid session)
     } = req.body;
 
     // ── Input validation ────────────────────────────────────
@@ -58,37 +54,7 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Terms acceptance required.', code: 'TERMS_REQUIRED' });
     }
 
-    // ── Paid plan check ─────────────────────────────────────
-    const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
-    let sessionId = 'sess_' + uuidv4().replace(/-/g, '').slice(0, 16);
-    let isPaidSession = false;
-
-    if (plan) {
-      // Paid session: create payment checkout first
-      isPaidSession = true;
-      const duration = parseInt(plan, 10);
-      if (!duration || duration < 1) {
-        return res.status(400).json({ success: false, error: 'Invalid plan duration.', code: 'INVALID_PLAN' });
-      }
-
-      const checkoutResult = await createPaymentCheckout({
-        sessionId,
-        duration,
-        clientMac: normalizedMac,
-        clientIp: clientIp || '',
-        apMac: apMac || '',
-        ssidName: ssidName || '',
-        redirectUrl: redirectUrl || '',
-      });
-
-      // Return checkout URL — frontend redirects user to payment page
-      return res.json({
-        success: true,
-        sessionId,
-        checkoutUrl: checkoutResult.checkoutUrl,
-        message: 'Redirect to payment to complete purchase.',
-      });
-    }
+    const sessionId = 'sess_' + uuidv4().replace(/-/g, '').slice(0, 16);
 
     // ── Free voucher validation ─────────────────────────────
     const voucherResult = await validateVoucher(voucher.trim(), normalizedMac);
@@ -137,9 +103,6 @@ router.post('/', async (req, res, next) => {
       apMac: apMac || '',
       ssidName: ssidName || '',
       duration,        // minutes
-      plan: plan || null,
-      paymentId: null,
-      webhookEventId: null,
       voucherUsed: voucher.trim(),
     });
 

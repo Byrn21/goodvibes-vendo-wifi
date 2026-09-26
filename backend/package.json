@@ -1,7 +1,7 @@
 {
   "name": "omada-captive-portal-backend",
   "version": "1.0.0",
-  "description": "Backend server for Omada captive portal — supports voucher validation, paid sessions, payment webhooks, and Omada controller integration.",
+  "description": "Backend server for Omada captive portal — supports voucher validation and Omada controller integration.",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

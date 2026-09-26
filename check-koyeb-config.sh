@@ -1,15 +1,16 @@
 #!/bin/bash
 
-# Quick setup script for Render deployment
+# Quick setup script for Koyeb deployment
 # This validates your configuration before deploying
 
-echo "🔍 Validating Render deployment configuration..."
+echo "🔍 Validating Koyeb deployment configuration..."
 echo ""
 
 # Check for required files
 echo "Checking required files..."
 required_files=(
-  "render.yaml"
+  ".koyeb/app.yaml"
+  "KOYEB_DEPLOYMENT.md"
   "backend/package.json"
   "backend/src/server.js"
   "backend/src/db/schema.sql"
@@ -34,7 +35,7 @@ if [ -f "backend/.env" ]; then
   echo "✅ backend/.env exists"
   echo ""
   echo "⚠️  Remember: .env is for LOCAL development only"
-  echo "   Set environment variables in Render dashboard for production"
+  echo "   Set environment variables in the Koyeb dashboard for production"
 else
   echo "⚠️  backend/.env not found (optional for local development)"
 fi
@@ -56,16 +57,16 @@ if [ $missing_files -eq 0 ]; then
   echo "📋 Next steps:"
   echo "1. Commit your changes:"
   echo "   git add ."
-  echo "   git commit -m 'Configure for Render deployment'"
+  echo "   git commit -m 'Configure for Koyeb deployment'"
   echo "   git push origin main"
   echo ""
-  echo "2. Deploy on Render:"
-  echo "   - Go to https://dashboard.render.com"
-  echo "   - Create new Web Service"
-  echo "   - Connect your repository"
-  echo "   - Add environment variables (see RENDER_DEPLOYMENT.md)"
+  echo "2. Deploy on Koyeb:"
+  echo "   - Go to https://app.koyeb.com"
+  echo "   - Create new App (GitHub source)"
+  echo "   - Koyeb will auto-detect .koyeb/app.yaml"
+  echo "   - Add environment variables (see KOYEB_DEPLOYMENT.md)"
   echo ""
-  echo "3. Read full guide: RENDER_DEPLOYMENT.md"
+  echo "3. Read full guide: KOYEB_DEPLOYMENT.md"
 else
   echo "❌ $missing_files file(s) missing. Please ensure all files are present."
   exit 1

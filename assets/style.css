@@ -690,102 +690,6 @@ body {
   .carousel__arrow { opacity: 0.7; }
 }
 
-/* ---- Voucher + Payment Section ---- */
-.auth-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--text-3);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-.auth-divider::before,
-.auth-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border-light);
-}
-
-/* Payment tiles */
-.payment-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.payment-tiles {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.payment-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 16px 10px 14px;
-  border-radius: var(--radius-md);
-  border: 1.5px solid var(--border);
-  background: var(--surface);
-  cursor: pointer;
-  transition: border-color var(--transition), box-shadow var(--transition),
-              transform 120ms ease, background var(--transition);
-  text-decoration: none;
-  color: var(--text);
-  position: relative;
-  overflow: hidden;
-  font-family: var(--font);
-  min-height: 100px;
-}
-
-.payment-tile:hover {
-  border-color: var(--primary-light);
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
-  background: var(--accent-2);
-}
-
-.payment-tile.is-selected,
-.payment-tile:active {
-  border-color: var(--green);
-  box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.18);
-  background: var(--success-bg);
-  transform: translateY(0);
-}
-
-/* PNG logo inside the tile */
-.payment-tile__icon-wrap {
-  width: 52px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.payment-tile__logo {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  display: block;
-  /* Fallback: show a placeholder badge if PNG missing */
-}
-
-.payment-tile__name {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: var(--text);
-  text-align: center;
-  letter-spacing: 0.01em;
-}
-
 /* ---- Timer / Countdown Widget ---- */
 .countdown-widget {
   display: flex;
@@ -1145,11 +1049,6 @@ body {
   .countdown-number { font-size: 3rem; }
   .countdown-sep     { font-size: 3rem; }
   .countdown-time    { font-size: 2.25rem; }
-
-  .payment-tiles { gap: 14px; }
-  .payment-tile  { padding: 20px 12px 16px; min-height: 112px; }
-  .payment-tile__icon-wrap { width: 60px; height: 60px; }
-  .payment-tile__name { font-size: 0.875rem; }
 }
 
 /* ---- Responsive: small phones ---- */

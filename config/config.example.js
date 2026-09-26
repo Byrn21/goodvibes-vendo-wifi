@@ -38,8 +38,7 @@
     //              Prefer 'backend' mode for reliable operation.
     //
     // 'backend' — JavaScript fetch() POST to your backend /api/auth.
-    //              Backend proxies to Omada. Supports paid sessions and
-    //              webhook-based payment flows.
+    //              Backend proxies to Omada. Supports voucher-based sessions.
     mode: 'direct',
 
     // ==============================================================
@@ -150,18 +149,6 @@
       // redirectUrl: 'url',
       // ssidName:    'ssid',
     },
-
-    // ==============================================================
-    // PAID SESSION PLANS (backend mode only)
-    // Uncomment and configure when using paid Wi-Fi.
-    // Each plan: { duration: minutes, price: smallest currency unit, label: 'human label' }
-    // Example: price 5000 = 50.00 of your currency
-    // ==============================================================
-    // plans: [
-    //   { duration: 60,  price: 5000,  label: '1 Hour'    },
-    //   { duration: 180, price: 12000, label: '3 Hours'   },
-    //   { duration: 1440, price: 25000, label: '24 Hours' },
-    // ],
 
     // ==============================================================
     // DEVELOPMENT / TESTING

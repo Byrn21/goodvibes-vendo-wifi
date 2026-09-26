@@ -1,6 +1,6 @@
 # Omada Captive Portal — Backend
 
-A Node.js / Express backend for the Omada captive portal. Handles voucher validation, payment processing, session management, and Omada controller integration.
+A Node.js / Express backend for the Omada captive portal. Handles voucher validation, session management, and Omada controller integration.
 
 ## Architecture
 
@@ -11,12 +11,10 @@ Browser (captive portal)  →  index.html
                                   │         ↓
                                   │   Omada extPortal/auth (direct POST)
                                   │
-                                  └── [paid or managed mode]
+                                  └── [managed mode]
                                             ↓
                                       Backend server
                                       ├── /api/auth         → validate voucher + call Omada
-                                      ├── /api/payment/create → create payment checkout
-                                      ├── /api/payment/webhook → receive + verify provider webhook
                                       ├── /api/session/status  → return remaining time
                                       ├── /api/session/pause   → freeze timer
                                       ├── /api/session/resume  → restart timer
@@ -81,75 +79,14 @@ See `.env.example` for the full list. Critical variables:
 |---|---|
 | `OMADA_BASE_URL` | Omada controller base URL |
 | `OMADA_API_TOKEN` | Controller API token |
-| `PAYMENT_PROVIDER` | `paymock` \| `paymongo` \| `xendit` |
-| `PAYMONGO_SECRET_KEY` | PayMongo secret key |
-| `XENDIT_SECRET_KEY` | Xendit secret key |
 | `DATABASE_URL` | Database connection string |
 | `JWT_SECRET` | Secret for JWT signing (change in prod!) |
-
-## Payment Provider Setup
-
-### PayMongo (Philippines)
-
-1. Create account at [paymongo.com](https://paymongo.com)
-2. Get your secret key from the dashboard
-3. Set `PAYMENT_PROVIDER=paymongo` in `.env`
-4. Set `PAYMONGO_SECRET_KEY` and `PAYMONGO_WEBHOOK_SECRET`
-5. Configure webhook URL in PayMongo dashboard:
-   ```
-   https://api.your-domain.com/api/payment/webhook
-   ```
-6. Use test mode keys for development (`sk_test_...`)
-
-### Xendit (Southeast Asia)
-
-1. Create account at [xendit.co](https://xendit.co)
-2. Set `PAYMENT_PROVIDER=xendit` in `.env`
-3. Configure callback URL in Xendit dashboard:
-   ```
-   https://api.your-domain.com/api/payment/webhook
-   ```
-
-### Mock (Development Only)
-
-```bash
-PAYMENT_PROVIDER=paymock
-```
-
-Mock mode accepts all payments and fires a synthetic webhook after checkout. Use for local testing without a payment account.
-
-## Payment Webhook Testing
-
-### PayMongo
-
-```bash
-# Use PayMongo's webhook testing tool in the dashboard,
-# or use the CLI:
-stripe-cli (not applicable)
-
-# Manual test:
-curl -X POST https://api.your-domain.com/api/payment/webhook \
-  -H "Content-Type: application/json" \
-  -H "Paymongo-Signature: t=$(date +%s),v1=$(echo -n '...' | openssl dgst -sha256 -hmac $PAYMONGO_WEBHOOK_SECRET | cut -d' ' -f2)" \
-  -d '{"data": {...}}'
-```
-
-### Xendit
-
-```bash
-curl -X POST https://api.your-domain.com/api/payment/webhook \
-  -H "Content-Type: application/json" \
-  -H "X-Callback-Token: $XENDIT_WEBHOOK_SECRET" \
-  -d '{"..."}'
-```
 
 ## API Endpoints
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `POST` | `/api/auth` | None | Authenticate with voucher |
-| `POST` | `/api/payment/create` | None | Create payment checkout |
-| `POST` | `/api/payment/webhook` | Signature | Payment provider webhook |
 | `GET` | `/api/session/status` | None | Get session info |
 | `POST` | `/api/session/pause` | None | Pause active session |
 | `POST` | `/api/session/resume` | None | Resume paused session |
@@ -167,7 +104,6 @@ npm test
 Tests cover:
 - `portal.js` (frontend): query param parsing, voucher validation, redirect allowlist, mock auth
 - `session.js`: state transitions, pause/resume, expiration math
-- `payment.js`: webhook signature verification, duplicate event handling
 - `omada.js`: error handling, mock responses
 
 ### End-to-end (with live controller)
@@ -184,10 +120,8 @@ Tests cover:
 - [ ] `NODE_ENV=production`
 - [ ] Strong `JWT_SECRET`
 - [ ] `OMADA_TLS_REJECT=true` (verify controller cert or use trusted CA)
-- [ ] PostgreSQL instead of SQLite
-- [ ] Payment provider in live mode (not test keys)
+- [ ] PostgreSQL instead of SQLite (or persistent volume for SQLite)
 - [ ] Rate limiting configured
-- [ ] Webhook endpoint publicly accessible (no auth by IP restriction)
 - [ ] Session expiration worker running (check logs on startup)
 - [ ] Logs monitored (no secrets logged)
 - [ ] Database backed up

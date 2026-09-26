@@ -3,8 +3,6 @@
  *
  * Routes:
  *   POST /api/auth              — Voucher authentication
- *   POST /api/payment/create    — Create paid checkout session
- *   POST /api/payment/webhook   — Payment provider webhook receiver
  *   GET  /api/session/status    — Poll session remaining time
  *   POST /api/session/pause     — Pause active session
  *   POST /api/session/resume    — Resume paused session
@@ -20,7 +18,6 @@ const compression = require('compression');
 
 const { rateLimit } = require('express-rate-limit');
 const authRoutes = require('./routes/auth');
-const paymentRoutes = require('./routes/payment');
 const sessionRoutes = require('./routes/session');
 const { startExpirationWorker } = require('./services/session');
 
@@ -68,20 +65,9 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Stricter rate limit for webhook endpoint (prevents brute-force)
-const webhookLimiter = rateLimit({
-  windowMs: 60000,
-  max: 60,
-  message: { success: false, error: 'Too many webhook requests.', code: 'RATE_LIMITED' },
-});
-
 // ── Routes ───────────────────────────────────────────────────
 app.use('/api/auth',     authRoutes);
-app.use('/api/payment',  paymentRoutes);
 app.use('/api/session',  sessionRoutes);
-
-// Payment webhook — use its own limiter, skip CORS (provider calls it)
-app.post('/api/payment/webhook', webhookLimiter, require('./routes/payment').handleWebhook);
 
 // Health check (unauthenticated)
 app.get('/health', (req, res) => {

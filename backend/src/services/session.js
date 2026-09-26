@@ -5,11 +5,9 @@
  * display mechanism. THIS service is authoritative.
  *
  * States:
- *   pending   — Created, awaiting payment (paid sessions only)
  *   active    — Session is running, timer counting down
  *   paused    — Session is frozen, timer stopped
  *   expired   — Session has ended (time up, or manually expired)
- *   failed    — Payment failed or session was invalidated
  */
 
 const { v4: uuidv4 } = require('uuid');
@@ -85,7 +83,7 @@ async function validateVoucher(voucher, clientMac) {
  */
 async function recordSession({
   sessionId, clientMac, clientIp, apMac, ssidName,
-  duration, plan, paymentId, webhookEventId, voucherUsed,
+  duration, voucherUsed,
 }) {
   const db = getDb();
   const now = new Date().toISOString();
@@ -95,9 +93,8 @@ async function recordSession({
     INSERT INTO sessions (
       session_id, client_mac, client_ip, ap_mac, ssid_name,
       duration_minutes, started_at, expires_at, state,
-      plan, payment_id, webhook_event_id, voucher_used,
-      created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+      voucher_used, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
   `).run(
     sessionId,
     clientMac || '',
@@ -107,9 +104,6 @@ async function recordSession({
     duration,
     now,
     expiresAt,
-    plan || null,
-    paymentId || null,
-    webhookEventId || null,
     voucherUsed || null,
     now,
     now
@@ -143,11 +137,6 @@ async function getSession(sessionId) {
     pausedAt: row.paused_at,
     remainingSeconds: row.remaining_seconds,
     state: row.state,
-    plan: row.plan,
-    amount: row.amount,
-    currency: row.currency,
-    paymentId: row.payment_id,
-    webhookEventId: row.webhook_event_id,
     voucherUsed: row.voucher_used,
     omadaAuthFailed: Boolean(row.omada_auth_failed),
     expireReason: row.expire_reason,
@@ -170,87 +159,36 @@ async function getSession(sessionId) {
 }
 
 /**
- * Mark session as payment-pending (paid session before checkout completes).
+ * Expire session — deactivate via Omada and mark expired in DB.
  */
-async function markPaymentPending(sessionId) {
-  const db = getDb();
-  const now = new Date().toISOString();
-
-  const existing = db.prepare(`SELECT id FROM sessions WHERE session_id = ?`).get(sessionId);
-
-  if (existing) {
-    db.prepare(`
-      UPDATE sessions SET state = 'pending', updated_at = ? WHERE session_id = ?
-    `).run(now, sessionId);
-  } else {
-    db.prepare(`
-      INSERT INTO sessions (session_id, state, duration_minutes, created_at, updated_at, client_mac)
-      VALUES (?, 'pending', ?, ?, ?, '')
-    `).run(sessionId, DEFAULT_DURATION, now, now);
-  }
-
-  return true;
-}
-
-/**
- * Activate a paid session after successful payment.
- * Also calls Omada to authenticate the client.
- */
-async function activatePaidSession(sessionId, eventId, amount) {
+async function expireSession(sessionId, reason = 'time_expired') {
   const db = getDb();
   const session = await getSession(sessionId);
 
   if (!session) return false;
+  if (session.state === 'expired') return false; // Idempotent
 
-  // Guard: only activate pending sessions
-  if (session.state !== 'pending') {
-    return session.state === 'active';
-  }
-
-  const now = new Date().toISOString();
-  const duration = session.duration || DEFAULT_DURATION;
-  const expiresAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
-
-  db.prepare(`
-    UPDATE sessions
-    SET state = 'active', started_at = ?, expires_at = ?,
-        payment_id = ?, webhook_event_id = ?, amount = ?, updated_at = ?
-    WHERE session_id = ?
-  `).run(now, expiresAt, eventId, eventId, amount, now, sessionId);
-
-  // Call Omada to authenticate the client
-  try {
-    await omadaService.authenticateClient({
-      clientMac: session.clientMac,
-      clientIp: session.clientIp,
-      apMac: session.apMac,
-      ssidName: session.ssidName,
-      username: 'paid_' + sessionId,
-      password: sessionId,
-      sessionId,
-    });
-  } catch (err) {
-    console.error('[activatePaidSession] Omada auth failed:', err.message);
-    db.prepare(`
-      UPDATE sessions SET omada_auth_failed = TRUE, updated_at = ? WHERE session_id = ?
-    `).run(new Date().toISOString(), sessionId);
-  }
-
-  return true;
-}
-
-/**
- * Mark a payment as failed.
- */
-async function markPaymentFailed(sessionId, eventId) {
-  const db = getDb();
+  const prevState = session.state;
   const now = new Date().toISOString();
 
   db.prepare(`
     UPDATE sessions
-    SET state = 'failed', webhook_event_id = ?, updated_at = ?
+    SET state = 'expired', expired_at = ?, expire_reason = ?, updated_at = ?
     WHERE session_id = ?
-  `).run(eventId, now, sessionId);
+  `).run(now, reason || 'unknown', now, sessionId);
+
+  // Call Omada unauth only if session was active or paused
+  if (prevState === 'active' || prevState === 'paused') {
+    try {
+      await omadaService.unauthenticateClient({
+        clientMac: session.clientMac,
+        apMac: session.apMac,
+        ssidName: session.ssidName,
+      });
+    } catch (err) {
+      console.warn('[expireSession] Omada unauth failed:', err.message);
+    }
+  }
 
   return true;
 }
@@ -383,32 +321,6 @@ async function isSessionActive(sessionId) {
 }
 
 /**
- * Idempotency: check if a webhook event has already been processed.
- */
-async function isEventProcessed(eventId) {
-  const db = getDb();
-  const row = db.prepare(`
-    SELECT id FROM webhook_events WHERE event_id = ? LIMIT 1
-  `).get(eventId);
-  return Boolean(row);
-}
-
-/**
- * Mark a webhook event as processed.
- */
-async function markEventProcessed(eventId, sessionId) {
-  if (!eventId) return false;
-
-  const db = getDb();
-  db.prepare(`
-    INSERT OR IGNORE INTO webhook_events (event_id, session_id, created_at)
-    VALUES (?, ?, CURRENT_TIMESTAMP)
-  `).run(eventId, sessionId || null);
-
-  return true;
-}
-
-/**
  * Background expiration worker.
  * Checks all active sessions every EXPIRE_CHECK_INTERVAL.
  * Calls Omada unauth for any that have expired.
@@ -455,11 +367,6 @@ module.exports = {
   resumeSession,
   expireSession,
   isSessionActive,
-  markPaymentPending,
-  activatePaidSession,
-  markPaymentFailed,
-  isEventProcessed,
-  markEventProcessed,
   startExpirationWorker,
   stopExpirationWorker,
   normalizeMac,

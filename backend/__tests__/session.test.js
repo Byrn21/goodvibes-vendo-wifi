@@ -1,12 +1,56 @@
 /**
  * __tests__/session.test.js
- * Unit tests for session state machine and countdown math
+ * Unit tests for session state machine, countdown math, and voucher
+ * validation against the SQLite-backed session service.
  */
 
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+// Use a temporary test database BEFORE requiring db/client.js
+const TEST_DB_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-test-'));
+process.env.DATABASE_URL = 'sqlite:' + path.join(TEST_DB_DIR, 'test.db');
+
 const sessionService = require('../src/services/session');
+const { getDb, closeDb } = require('../src/db/client');
+
+function applySchema() {
+  const schema = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'db', 'schema.sql'),
+    'utf8'
+  );
+  getDb().exec(schema);
+}
+
+function seedVouchers() {
+  const db = getDb();
+  const insert = db.prepare(`
+    INSERT INTO vouchers (code, duration_minutes, state)
+    VALUES (?, ?, ?)
+  `);
+  insert.run('WIFI-TEST-0001', 60, 'active');
+  insert.run('EXPIRED-VOUCHER', 60, 'expired');
+  insert.run('USED-VOUCHER', 60, 'used');
+}
+
+beforeAll(() => {
+  applySchema();
+});
+
+afterAll(() => {
+  closeDb();
+  try {
+    fs.rmSync(TEST_DB_DIR, { recursive: true, force: true });
+  } catch (err) {
+    // best-effort cleanup
+  }
+});
 
 beforeEach(() => {
-  sessionService._resetAll();
+  const db = getDb();
+  db.exec('DELETE FROM sessions; DELETE FROM vouchers;');
+  seedVouchers();
 });
 
 describe('Session State Machine', () => {
@@ -18,10 +62,7 @@ describe('Session State Machine', () => {
       apMac: '00:11:22:33:44:55',
       ssidName: 'HotelGuest',
       duration: 60,
-      plan: null,
-      paymentId: null,
-      webhookEventId: null,
-      voucherUsed: 'WIFI-TEST-001',
+      voucherUsed: 'WIFI-TEST-0001',
     });
 
     expect(s.state).toBe('active');
@@ -42,16 +83,16 @@ describe('Session State Machine', () => {
       duration: 60,
     });
 
-    // Manually fast-forward expiresAt
-    const s = sessionService._sessions.get('sess_pause_001');
-    s.expiresAt = new Date(Date.now() + 1800 * 1000).toISOString(); // 30 min left
-    sessionService._sessions.set('sess_pause_001', s);
+    // Manually fast-forward expiresAt in the DB (30 min left)
+    const db = getDb();
+    db.prepare(`UPDATE sessions SET expires_at = ? WHERE session_id = ?`)
+      .run(new Date(Date.now() + 1800 * 1000).toISOString(), 'sess_pause_001');
 
     const paused = await sessionService.pauseSession('sess_pause_001');
     expect(paused.state).toBe('paused');
     expect(paused.pausedAt).toBeTruthy();
-    expect(paused.remainingSecondsAtPause).toBeGreaterThan(1700);
-    expect(paused.remainingSecondsAtPause).toBeLessThanOrEqual(1800);
+    expect(paused.remainingSeconds).toBeGreaterThan(1700);
+    expect(paused.remainingSeconds).toBeLessThanOrEqual(1800);
   });
 
   test('resume restarts timer from remaining seconds', async () => {
@@ -61,13 +102,13 @@ describe('Session State Machine', () => {
       duration: 60,
     });
 
-    // Get current remaining
-    const before = sessionService._sessions.get('sess_resume_001');
-    before.state = 'paused';
-    before.pausedAt = new Date().toISOString();
-    before.remainingSecondsAtPause = 1500;
-    before.expiresAt = null;
-    sessionService._sessions.set('sess_resume_001', before);
+    // Force the session into a paused state with 1500s remaining
+    const db = getDb();
+    db.prepare(`
+      UPDATE sessions
+      SET state = 'paused', paused_at = ?, remaining_seconds = 1500, expires_at = NULL
+      WHERE session_id = ?
+    `).run(new Date().toISOString(), 'sess_resume_001');
 
     const resumed = await sessionService.resumeSession('sess_resume_001');
     expect(resumed.state).toBe('active');
@@ -116,13 +157,13 @@ describe('Session Expiration Math', () => {
     });
 
     // Manually set expiresAt to 30 min from now
-    const s = sessionService._sessions.get('sess_remaining_001');
-    s.expiresAt = new Date(Date.now() + 1800 * 1000).toISOString();
-    sessionService._sessions.set('sess_remaining_001', s);
+    const db = getDb();
+    db.prepare(`UPDATE sessions SET expires_at = ? WHERE session_id = ?`)
+      .run(new Date(Date.now() + 1800 * 1000).toISOString(), 'sess_remaining_001');
 
     const retrieved = await sessionService.getSession('sess_remaining_001');
     expect(retrieved.state).toBe('active');
-    expect(retrieved.remainingSeconds).toBeUndefined(); // getSession doesn't compute remaining directly
+    expect(retrieved.remainingSeconds).toBeFalsy(); // getSession doesn't compute remaining directly
     // The routes/session.js computeRemaining function handles this
   });
 
@@ -133,15 +174,17 @@ describe('Session Expiration Math', () => {
       duration: 60,
     });
 
-    const s = sessionService._sessions.get('sess_paused_remaining');
-    s.state = 'paused';
-    s.remainingSecondsAtPause = 3600;
-    s.pausedAt = new Date().toISOString();
-    sessionService._sessions.set('sess_paused_remaining', s);
+    // Manually pause the session with 3600s frozen
+    const db = getDb();
+    db.prepare(`
+      UPDATE sessions
+      SET state = 'paused', paused_at = ?, remaining_seconds = 3600, expires_at = NULL
+      WHERE session_id = ?
+    `).run(new Date().toISOString(), 'sess_paused_remaining');
 
     const retrieved = await sessionService.getSession('sess_paused_remaining');
     expect(retrieved.state).toBe('paused');
-    expect(retrieved.remainingSecondsAtPause).toBe(3600);
+    expect(retrieved.remainingSeconds).toBe(3600);
   });
 
   test('isSessionActive returns false for non-existent session', async () => {
@@ -191,13 +234,13 @@ describe('Voucher Validation', () => {
   });
 
   test('rejects expired voucher', async () => {
-    const r = await sessionService.validateVoucher('EXPIRED', 'aa:bb:cc:dd:ee:ff');
+    const r = await sessionService.validateVoucher('EXPIRED-VOUCHER', 'aa:bb:cc:dd:ee:ff');
     expect(r.valid).toBe(false);
     expect(r.code).toBe('EXPIRED_VOUCHER');
   });
 
   test('rejects used voucher', async () => {
-    const r = await sessionService.validateVoucher('USED', 'aa:bb:cc:dd:ee:ff');
+    const r = await sessionService.validateVoucher('USED-VOUCHER', 'aa:bb:cc:dd:ee:ff');
     expect(r.valid).toBe(false);
     expect(r.code).toBe('USED_VOUCHER');
   });
@@ -206,26 +249,5 @@ describe('Voucher Validation', () => {
     const r = await sessionService.validateVoucher('ABC', 'aa:bb:cc:dd:ee:ff');
     expect(r.valid).toBe(false);
     expect(r.code).toBe('INVALID_VOUCHER');
-  });
-});
-
-describe('Webhook Idempotency', () => {
-  test('marks event as processed', async () => {
-    const eventId = 'evt_test_001';
-    const sessionId = 'sess_test_001';
-
-    const first = await sessionService.isEventProcessed(eventId);
-    expect(first).toBe(false);
-
-    await sessionService.markEventProcessed(eventId, sessionId);
-
-    const second = await sessionService.isEventProcessed(eventId);
-    expect(second).toBe(true);
-  });
-
-  test('duplicate webhook returns true for isEventProcessed', async () => {
-    await sessionService.markEventProcessed('evt_dup', 'sess_dup');
-    const result = await sessionService.isEventProcessed('evt_dup');
-    expect(result).toBe(true);
   });
 });

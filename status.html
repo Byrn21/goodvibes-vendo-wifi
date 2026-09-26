@@ -79,10 +79,6 @@
             <dt>Expires</dt>
             <dd id="detail-expires">—</dd>
           </div>
-          <div class="session-detail-row">
-            <dt>Plan</dt>
-            <dd id="detail-plan">—</dd>
-          </div>
         </dl>
 
         <!-- Pause / Resume controls -->
@@ -229,7 +225,6 @@
         detailSid:    $('detail-session-id'),
         detailStart:  $('detail-started'),
         detailExpiry: $('detail-expires'),
-        detailPlan:   $('detail-plan'),
         btnPause:     $('btn-pause'),
         pauseConfirm: $('pause-confirm'),
         btnPauseConfirm: $('btn-pause-confirm'),
@@ -370,7 +365,6 @@
         if (els.detailSid)    els.detailSid.textContent    = data.sessionId || '—';
         if (els.detailStart) els.detailStart.textContent  = formatDate(data.startedAt);
         if (els.detailExpiry) els.detailExpiry.textContent = formatDate(data.expiresAt);
-        if (els.detailPlan)   els.detailPlan.textContent   = data.plan ? data.plan + ' min' : '—';
 
         if (state === 'active') {
           showSection('active');

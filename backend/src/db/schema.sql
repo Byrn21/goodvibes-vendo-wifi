@@ -33,11 +33,6 @@ CREATE TABLE IF NOT EXISTS sessions (
     remaining_seconds     INTEGER,  -- remaining seconds when paused (frozen)
     state                 VARCHAR(16) NOT NULL DEFAULT 'pending',
         -- pending, active, paused, expired, failed
-    plan                  VARCHAR(16),          -- e.g. "60", "180"
-    amount                INTEGER,              -- in smallest currency unit
-    currency              VARCHAR(3) DEFAULT 'PHP',
-    payment_id            VARCHAR(64),          -- provider payment/charge ID
-    webhook_event_id      VARCHAR(64),          -- provider event ID (idempotency)
     voucher_used          VARCHAR(32),
     omada_auth_failed     BOOLEAN DEFAULT FALSE,
     expire_reason         VARCHAR(32),
@@ -52,20 +47,6 @@ CREATE INDEX IF NOT EXISTS idx_sessions_client_mac ON sessions(client_mac);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_session_id ON sessions(session_id);
 CREATE INDEX IF NOT EXISTS idx_vouchers_code       ON vouchers(code);
-
--- Webhook event log for idempotency
-CREATE TABLE IF NOT EXISTS webhook_events (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_id    VARCHAR(64) NOT NULL UNIQUE,
-    session_id  VARCHAR(32),
-    event_type  VARCHAR(64),
-    provider    VARCHAR(32),
-    raw_payload TEXT,          -- For debugging (consider redacting in production)
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_webhook_events_event_id ON webhook_events(event_id);
-CREATE INDEX IF NOT EXISTS idx_webhook_events_session  ON webhook_events(session_id);
 
 -- Admin users (for /admin routes, if you add them)
 CREATE TABLE IF NOT EXISTS admin_users (

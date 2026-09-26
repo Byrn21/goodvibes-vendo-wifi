@@ -56,7 +56,6 @@
     supportPhone: '',
     mockMode: false,
     mockSuccessDelay: 800,
-    plans: null,        // [ {duration: 60, price: 5000, label: '1 hour'} ] - paid plans
   };
 
   // Merge config with defaults
@@ -65,8 +64,6 @@
     if (DEFAULTS.hasOwnProperty(k)) {
       if (k === 'paramMap' || k === 'voucher') {
         CONFIG[k] = Object.assign({}, DEFAULTS[k], C[k] || {});
-      } else if (k === 'plans') {
-        CONFIG[k] = C[k] || DEFAULTS[k];
       } else {
         CONFIG[k] = (C[k] !== undefined) ? C[k] : DEFAULTS[k];
       }
@@ -245,44 +242,6 @@
   }
 
   // ===============================================================
-  // PLAN SELECTOR (paid mode)
-  // ===============================================================
-  function initPlanSelector() {
-    var planSection = $('plan-section');
-    var planSelect = $('plan-select');
-    if (!planSection || !planSelect) return;
-
-    // Paid plans only visible in backend mode with plans configured
-    if (CONFIG.mode !== 'backend' || !CONFIG.plans || CONFIG.plans.length === 0) {
-      return;
-    }
-
-    show(planSection);
-
-    // Populate options
-    CONFIG.plans.forEach(function (plan) {
-      var opt = document.createElement('option');
-      opt.value = plan.duration; // minutes
-      opt.textContent = plan.label + ' — ' + formatPrice(plan.price);
-      planSelect.appendChild(opt);
-    });
-
-    // When plan selected, change submit button label
-    planSelect.addEventListener('change', function () {
-      var submitLabel = $('submit-label');
-      if (submitLabel) {
-        submitLabel.textContent = planSelect.value ? 'Pay & Connect' : 'Connect Now';
-      }
-    });
-  }
-
-  function formatPrice(amount) {
-    // Amount in smallest currency unit (e.g., centavos for PHP)
-    var pesos = (amount / 100).toFixed(2);
-    return '₱' + pesos;
-  }
-
-  // ===============================================================
   // FORM SUBMISSION
   // ===============================================================
   var submitting = false;
@@ -323,18 +282,6 @@
       return;
     }
 
-    // ---- Plan validation (paid mode) ----
-    var planSelect = $('plan-select');
-    var plan = null;
-    if (planSelect && !planSelect.classList.contains('hidden') && CONFIG.plans) {
-      plan = planSelect.value;
-      if (!plan) {
-        setFormError('Please select a plan duration.');
-        planSelect.focus();
-        return;
-      }
-    }
-
     // ---- Begin submission ----
     submitting = true;
     if (submitBtn) {
@@ -346,12 +293,11 @@
       loadingOverlay.setAttribute('aria-hidden', 'false');
       show(loadingOverlay);
     }
-    if (loadingText) loadingText.textContent = plan ? 'Processing payment…' : 'Connecting…';
+    if (loadingText) loadingText.textContent = 'Connecting…';
 
     var clientContext = buildClientContext();
     clientContext.voucher = vResult.value;
     clientContext.termsAccepted = termsChecked;
-    if (plan) clientContext.plan = plan;
 
     var promise;
     if (CONFIG.mockMode) {
@@ -368,7 +314,7 @@
         submitBtn.disabled = false;
         submitBtn.removeAttribute('aria-busy');
       }
-      if (submitLabel) submitLabel.textContent = plan && !plan ? 'Pay & Connect' : 'Connect Now';
+      if (submitLabel) submitLabel.textContent = 'Connect Now';
       if (loadingOverlay) {
         loadingOverlay.setAttribute('aria-hidden', 'true');
         hide(loadingOverlay);
@@ -456,7 +402,6 @@
           ssidName:  ctx.ssidName,
           redirectUrl: ctx.redirectUrl,
           termsAccepted: ctx.termsAccepted,
-          plan: ctx.plan || null,
         }),
       }).then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (data) {
@@ -468,7 +413,6 @@
           resolve({
             redirectUrl: data.redirectUrl || ctx.redirectUrl,
             sessionId: data.sessionId,
-            checkoutUrl: data.checkoutUrl || null,
           });
         } else {
           reject({
@@ -506,7 +450,6 @@
           resolve({
             redirectUrl: ctx.redirectUrl,
             sessionId: 'sess_mock_' + Math.random().toString(36).slice(2, 10),
-            checkoutUrl: null,
           });
         }
       }, delay);
@@ -515,12 +458,6 @@
 
   // ---- Handle successful auth ----
   function handleSuccess(result) {
-    // If there's a checkout URL (paid flow), redirect to payment
-    if (result.checkoutUrl) {
-      window.location.href = result.checkoutUrl;
-      return;
-    }
-
     // Build success URL with redirect and session info
     var params = new URLSearchParams();
     if (result.redirectUrl) params.set('redirectUrl', encodeURIComponent(result.redirectUrl));
@@ -612,43 +549,6 @@
   }
 
   // ===============================================================
-  // PAYMENT TILES
-  // ===============================================================
-  function initPaymentTiles() {
-    var tiles = document.querySelectorAll('.payment-tile');
-    if (!tiles.length) return;
-
-    tiles.forEach(function (tile) {
-      tile.addEventListener('click', function () {
-        // Deselect all
-        tiles.forEach(function (t) { t.classList.remove('is-selected'); });
-        // Select this one
-        tile.classList.add('is-selected');
-
-        var method = tile.getAttribute('data-payment');
-        var planSelect = $('plan-select');
-        var planSection = $('plan-section');
-
-        // If a plan is selected, redirect to the appropriate checkout flow
-        if (planSelect && planSelect.value) {
-          var plan = CONFIG.plans && CONFIG.plans.find(function (p) {
-            return String(p.duration) === planSelect.value;
-          });
-          if (plan) {
-            // Redirect to payment endpoint for the selected method
-            var checkoutUrl = (CONFIG.apiBaseUrl || '') + '/api/payment/initiate?' + [
-              'method=' + encodeURIComponent(method),
-              'plan=' + encodeURIComponent(planSelect.value),
-              'clientMac=' + encodeURIComponent(queryParams.clientMac || ''),
-            ].join('&');
-            window.location.href = checkoutUrl;
-          }
-        }
-      });
-    });
-  }
-
-  // ===============================================================
   // INIT
   // ===============================================================
   function init() {
@@ -660,12 +560,6 @@
 
     // Set up terms visibility
     initTermsSection();
-
-    // Set up plan selector (paid mode)
-    initPlanSelector();
-
-    // Set up payment tile interactions
-    initPaymentTiles();
 
     // Input UX
     initInputEnhancements();
