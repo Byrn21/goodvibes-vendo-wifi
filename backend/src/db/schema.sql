@@ -1,11 +1,9 @@
 -- ================================================================
 -- schema.sql — Omada captive portal database schema
 -- ================================================================
--- Target: SQLite (development) / PostgreSQL (production)
--- Both databases use standard SQL — minor adjustments noted.
+-- Target: SQLite only
 --
 -- Run with: sqlite3 data/portal.db < src/db/schema.sql
--- Or for PostgreSQL: psql portal < src/db/schema.sql
 -- ================================================================
 
 -- Voucher codes table
@@ -82,15 +80,11 @@ CREATE TABLE IF NOT EXISTS admin_users (
 -- ================================================================
 -- Notes:
 --
--- 1. For PostgreSQL, replace INTEGER PRIMARY KEY AUTOINCREMENT
---    with SERIAL PRIMARY KEY, and TIMESTAMP DEFAULT CURRENT_TIMESTAMP
---    with TIMESTAMP DEFAULT NOW().
---
--- 2. MAC addresses are stored with colons (e.g. aa:bb:cc:dd:ee:ff).
+-- 1. MAC addresses are stored with colons (e.g. aa:bb:cc:dd:ee:ff).
 --    Normalize on insert.
 --
--- 3. All timestamps are in UTC. Display in local time at the frontend.
+-- 2. All timestamps are in UTC. Display in local time at the frontend.
 --
--- 4. Consider adding a "batch" table for bulk voucher generation,
+-- 3. Consider adding a "batch" table for bulk voucher generation,
 --    or integrate directly with your point-of-sale / PMS system.
 -- ================================================================

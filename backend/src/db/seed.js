@@ -6,18 +6,10 @@
  */
 
 require('dotenv').config();
-const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
-const { Database } = require('better-sqlite3');
-const { Pool } = require('pg');
+const Database = require('better-sqlite3');
 
 const DATABASE_URL = process.env.DATABASE_URL || 'sqlite:./data/portal.db';
-
-function generateVoucher(prefix, durationMinutes) {
-  const rand = crypto.randomBytes(4).toString('hex').toUpperCase();
-  return `${prefix}-${rand}`;
-}
 
 async function seed() {
   if (process.env.NODE_ENV === 'production') {
@@ -35,43 +27,27 @@ async function seed() {
     { code: 'USED-VOUCHER',    duration: 60,  state: 'used' },
   ];
 
-  if (DATABASE_URL.startsWith('sqlite:')) {
-    const dbPath = DATABASE_URL.replace('sqlite:', '');
-    const absolutePath = path.resolve(dbPath);
-    const db = new Database(absolutePath);
-    db.pragma('journal_mode = WAL');
-
-    const insert = db.prepare(`
-      INSERT OR IGNORE INTO vouchers (code, duration_minutes, state)
-      VALUES (?, ?, ?)
-    `);
-
-    const insertMany = db.transaction((rows) => {
-      for (const v of rows) insert.run(v.code, v.duration, v.state);
-    });
-
-    insertMany(vouchers);
-    console.log('[seed] Inserted', vouchers.length, 'vouchers into SQLite.');
-    db.close();
-  } else if (DATABASE_URL.startsWith('postgresql:')) {
-    const pool = new Pool({ connectionString: DATABASE_URL });
-    const client = await pool.connect();
-
-    try {
-      for (const v of vouchers) {
-        await client.query(
-          `INSERT INTO vouchers (code, duration_minutes, state)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (code) DO NOTHING`,
-          [v.code, v.duration, v.state]
-        );
-      }
-      console.log('[seed] Inserted', vouchers.length, 'vouchers into PostgreSQL.');
-    } finally {
-      client.release();
-      await pool.end();
-    }
+  if (!DATABASE_URL.startsWith('sqlite:')) {
+    throw new Error('Only SQLite is supported. DATABASE_URL must start with sqlite:');
   }
+
+  const dbPath = DATABASE_URL.replace('sqlite:', '');
+  const absolutePath = path.resolve(dbPath);
+  const db = new Database(absolutePath);
+  db.pragma('journal_mode = WAL');
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO vouchers (code, duration_minutes, state)
+    VALUES (?, ?, ?)
+  `);
+
+  const insertMany = db.transaction((rows) => {
+    for (const v of rows) insert.run(v.code, v.duration, v.state);
+  });
+
+  insertMany(vouchers);
+  console.log('[seed] Inserted', vouchers.length, 'vouchers into SQLite.');
+  db.close();
 }
 
 seed().catch(err => {

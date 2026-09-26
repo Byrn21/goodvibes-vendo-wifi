@@ -33,9 +33,9 @@
     // BACKEND MODE
     // ==============================================================
     // Base URL of your backend server (no trailing slash)
-    // Update this when you deploy to Fly.io:
-    // e.g. https://goodvibesvendowifi-backend.fly.dev
-    apiBaseUrl: 'https://goodvibesvendowifi-backend.fly.dev',
+    // Update this when you deploy to Render:
+    // e.g. https://your-app-name.onrender.com
+    apiBaseUrl: 'https://your-app-name.onrender.com',
 
     // ==============================================================
     // VOUCHER VALIDATION

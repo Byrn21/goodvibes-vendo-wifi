@@ -1,0 +1,59 @@
+services:
+  - type: web
+    name: omada-portal-backend
+    runtime: node
+    region: singapore
+    buildCommand: cd backend && npm install && npm run db:migrate
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8080
+      - key: DATABASE_URL
+        value: sqlite:./data/portal.db
+      - key: DEFAULT_SESSION_DURATION
+        value: 60
+      - key: SESSION_DURATION_OPTIONS
+        value: 60,120,180,360,720,1440
+      - key: PAUSE_ENABLED
+        value: true
+      - key: SESSION_ENFORCE_INTERVAL
+        value: 60000
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 20
+      - key: DEFAULT_REDIRECT_URL
+        value: https://www.google.com
+      - key: LOG_LEVEL
+        value: info
+      - key: PAYMENT_PROVIDER
+        value: xendit
+      - key: PRICE_PER_HOUR
+        value: 5000
+      # Add these from Render dashboard (secret):
+      - key: BASE_URL
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: OMADA_BASE_URL
+        sync: false
+      - key: OMADA_API_TOKEN
+        sync: false
+      - key: OMADA_SITE
+        sync: false
+      - key: XENDIT_SECRET_KEY
+        sync: false
+      - key: XENDIT_WEBHOOK_SECRET
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+    disk:
+      name: portal-data
+      mountPath: /opt/render/project/src/backend/data
+      sizeGB: 1
+    healthCheckPath: /health
+    autoDeploy: true

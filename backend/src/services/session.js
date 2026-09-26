@@ -10,30 +10,14 @@
  *   paused    — Session is frozen, timer stopped
  *   expired   — Session has ended (time up, or manually expired)
  *   failed    — Payment failed or session was invalidated
- *
- * Data model (see db/schema.sql for table DDL):
- *   sessions(
- *     session_id, client_mac, client_ip, ap_mac, ssid_name,
- *     duration_minutes, started_at, expires_at,
- *     paused_at, remaining_seconds_at_pause,
- *     state, payment_id, webhook_event_id,
- *     voucher_used, created_at, updated_at
- *   )
- *
- *   webhook_events(event_id, session_id, event_type, created_at)
  */
 
 const { v4: uuidv4 } = require('uuid');
 const omadaService = require('./omada');
-
-// In-memory store for development. Replace with DB queries in production.
-// ⚠️ This in-memory store is for DEVELOPMENT and TESTING only.
-//    In production, use the database schema in db/schema.sql.
-const sessions = new Map();     // sessionId -> session object
-const webhookEvents = new Map(); // eventId -> sessionId
+const { getDb } = require('../db/client');
 
 const DEFAULT_DURATION = parseInt(process.env.DEFAULT_SESSION_DURATION || '60', 10);
-const EXPIRE_CHECK_INTERVAL = parseInt(process.env.SESSION_ENFORCE_INTERVAL || '60000', 10); // 1 min
+const EXPIRE_CHECK_INTERVAL = parseInt(process.env.SESSION_ENFORCE_INTERVAL || '60000', 10);
 let expirationTimer = null;
 
 /**
@@ -47,34 +31,53 @@ function normalizeMac(mac) {
 }
 
 /**
- * Validate a free voucher.
- * ⚠️ Replace with real voucher database lookup in production.
+ * Validate a free voucher against database.
  * @returns { valid: boolean, code?: string, duration?: number, message?: string }
  */
 async function validateVoucher(voucher, clientMac) {
-  // ⚠️ EXAMPLE VOUCHER SYSTEM — replace with real voucher validation.
-  //
-  // In production, look up the voucher in a database table:
-  //   SELECT * FROM vouchers WHERE code = ? AND state = 'active' LIMIT 1
-  // Mark it as used, record the client MAC, and return the duration.
-  //
-  // For this template, we implement a simple mock voucher system.
+  const db = getDb();
 
-  const v = voucher.toUpperCase();
+  const row = db.prepare(`
+    SELECT id, code, duration_minutes, state, used_by_mac, expires_at
+    FROM vouchers
+    WHERE code = ? COLLATE NOCASE
+    LIMIT 1
+  `).get(voucher);
 
-  // Mock: reject known-bad patterns
-  if (v === 'EXPIRED' || v === 'EXPIRED-VOUCHER') {
-    return { valid: false, code: 'EXPIRED_VOUCHER', message: 'This voucher has expired.' };
-  }
-  if (v === 'USED' || v === 'USED-VOUCHER') {
-    return { valid: false, code: 'USED_VOUCHER', message: 'This voucher has already been used.' };
-  }
-  if (v.length < 6) {
+  if (!row) {
     return { valid: false, code: 'INVALID_VOUCHER', message: 'Invalid voucher code.' };
   }
 
-  // Mock: accept anything else, give 60 minutes
-  return { valid: true, duration: DEFAULT_DURATION, message: 'Voucher accepted.' };
+  if (row.state === 'expired') {
+    return { valid: false, code: 'EXPIRED_VOUCHER', message: 'This voucher has expired.' };
+  }
+
+  if (row.state === 'used') {
+    return { valid: false, code: 'USED_VOUCHER', message: 'This voucher has already been used.' };
+  }
+
+  if (row.state !== 'active') {
+    return { valid: false, code: 'INVALID_VOUCHER', message: 'Voucher is not available.' };
+  }
+
+  // Check voucher expiration date
+  if (row.expires_at) {
+    const expiresAt = new Date(row.expires_at);
+    if (Date.now() > expiresAt.getTime()) {
+      // Mark as expired
+      db.prepare(`UPDATE vouchers SET state = 'expired' WHERE id = ?`).run(row.id);
+      return { valid: false, code: 'EXPIRED_VOUCHER', message: 'This voucher has expired.' };
+    }
+  }
+
+  // Mark voucher as used
+  db.prepare(`
+    UPDATE vouchers
+    SET state = 'used', used_by_mac = ?, used_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(clientMac || '', row.id);
+
+  return { valid: true, duration: row.duration_minutes, message: 'Voucher accepted.' };
 }
 
 /**
@@ -84,77 +87,108 @@ async function recordSession({
   sessionId, clientMac, clientIp, apMac, ssidName,
   duration, plan, paymentId, webhookEventId, voucherUsed,
 }) {
-  const now = new Date();
-  const startedAt = now;
-  const expiresAt = new Date(now.getTime() + duration * 60 * 1000);
+  const db = getDb();
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
 
-  const session = {
+  db.prepare(`
+    INSERT INTO sessions (
+      session_id, client_mac, client_ip, ap_mac, ssid_name,
+      duration_minutes, started_at, expires_at, state,
+      plan, payment_id, webhook_event_id, voucher_used,
+      created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+  `).run(
     sessionId,
-    clientMac: clientMac || '',
-    clientIp: clientIp || '',
-    apMac: apMac || '',
-    ssidName: ssidName || '',
-    duration: duration || DEFAULT_DURATION,
-    plan: plan || null,
-    startedAt: startedAt.toISOString(),
-    expiresAt: expiresAt.toISOString(),
-    pausedAt: null,
-    remainingSecondsAtPause: null,
-    state: 'active',
-    paymentId: paymentId || null,
-    webhookEventId: webhookEventId || null,
-    voucherUsed: voucherUsed || null,
-    createdAt: startedAt.toISOString(),
-    updatedAt: startedAt.toISOString(),
-  };
+    clientMac || '',
+    clientIp || '',
+    apMac || '',
+    ssidName || '',
+    duration,
+    now,
+    expiresAt,
+    plan || null,
+    paymentId || null,
+    webhookEventId || null,
+    voucherUsed || null,
+    now,
+    now
+  );
 
-  sessions.set(sessionId, session);
-  return session;
+  return await getSession(sessionId);
 }
 
 /**
  * Get a session by ID.
  */
 async function getSession(sessionId) {
-  const s = sessions.get(sessionId);
-  if (!s) return null;
+  const db = getDb();
 
-  // If active, check if it's past expiresAt (server-side enforcement)
-  if (s.state === 'active' && s.expiresAt) {
+  const row = db.prepare(`
+    SELECT * FROM sessions WHERE session_id = ? LIMIT 1
+  `).get(sessionId);
+
+  if (!row) return null;
+
+  // Map database columns to camelCase
+  const session = {
+    sessionId: row.session_id,
+    clientMac: row.client_mac,
+    clientIp: row.client_ip,
+    apMac: row.ap_mac,
+    ssidName: row.ssid_name,
+    duration: row.duration_minutes,
+    startedAt: row.started_at,
+    expiresAt: row.expires_at,
+    pausedAt: row.paused_at,
+    remainingSeconds: row.remaining_seconds,
+    state: row.state,
+    plan: row.plan,
+    amount: row.amount,
+    currency: row.currency,
+    paymentId: row.payment_id,
+    webhookEventId: row.webhook_event_id,
+    voucherUsed: row.voucher_used,
+    omadaAuthFailed: Boolean(row.omada_auth_failed),
+    expireReason: row.expire_reason,
+    expiredAt: row.expired_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+
+  // Check server-side expiration for active sessions
+  if (session.state === 'active' && session.expiresAt) {
     const now = Date.now();
-    const expiresAt = new Date(s.expiresAt).getTime();
+    const expiresAt = new Date(session.expiresAt).getTime();
     if (now >= expiresAt) {
       await expireSession(sessionId, 'time_expired');
-      return { ...s, state: 'expired' };
+      return { ...session, state: 'expired' };
     }
   }
 
-  return { ...s };
+  return session;
 }
 
 /**
  * Mark session as payment-pending (paid session before checkout completes).
  */
 async function markPaymentPending(sessionId) {
+  const db = getDb();
   const now = new Date().toISOString();
-  if (sessions.has(sessionId)) {
-    const s = sessions.get(sessionId);
-    s.state = 'pending';
-    s.updatedAt = now;
-    sessions.set(sessionId, s);
+
+  const existing = db.prepare(`SELECT id FROM sessions WHERE session_id = ?`).get(sessionId);
+
+  if (existing) {
+    db.prepare(`
+      UPDATE sessions SET state = 'pending', updated_at = ? WHERE session_id = ?
+    `).run(now, sessionId);
   } else {
-    sessions.set(sessionId, {
-      sessionId,
-      state: 'pending',
-      duration: DEFAULT_DURATION,
-      startedAt: null,
-      expiresAt: null,
-      pausedAt: null,
-      remainingSecondsAtPause: null,
-      createdAt: now,
-      updatedAt: now,
-    });
+    db.prepare(`
+      INSERT INTO sessions (session_id, state, duration_minutes, created_at, updated_at, client_mac)
+      VALUES (?, 'pending', ?, ?, ?, '')
+    `).run(sessionId, DEFAULT_DURATION, now, now);
   }
+
   return true;
 }
 
@@ -163,46 +197,43 @@ async function markPaymentPending(sessionId) {
  * Also calls Omada to authenticate the client.
  */
 async function activatePaidSession(sessionId, eventId, amount) {
-  const s = sessions.get(sessionId);
-  if (!s) return false;
+  const db = getDb();
+  const session = await getSession(sessionId);
+
+  if (!session) return false;
 
   // Guard: only activate pending sessions
-  if (s.state !== 'pending') {
-    // If already active, it's a duplicate — return true but don't re-charge
-    return s.state === 'active';
+  if (session.state !== 'pending') {
+    return session.state === 'active';
   }
 
-  const now = new Date();
-  const duration = s.duration || DEFAULT_DURATION;
-  const expiresAt = new Date(now.getTime() + duration * 60 * 1000);
+  const now = new Date().toISOString();
+  const duration = session.duration || DEFAULT_DURATION;
+  const expiresAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
 
-  s.state = 'active';
-  s.startedAt = now.toISOString();
-  s.expiresAt = expiresAt.toISOString();
-  s.paymentId = eventId;
-  s.webhookEventId = eventId;
-  s.amount = amount;
-  s.updatedAt = now.toISOString();
-
-  sessions.set(sessionId, s);
+  db.prepare(`
+    UPDATE sessions
+    SET state = 'active', started_at = ?, expires_at = ?,
+        payment_id = ?, webhook_event_id = ?, amount = ?, updated_at = ?
+    WHERE session_id = ?
+  `).run(now, expiresAt, eventId, eventId, amount, now, sessionId);
 
   // Call Omada to authenticate the client
   try {
     await omadaService.authenticateClient({
-      clientMac: s.clientMac,
-      clientIp: s.clientIp,
-      apMac: s.apMac,
-      ssidName: s.ssidName,
+      clientMac: session.clientMac,
+      clientIp: session.clientIp,
+      apMac: session.apMac,
+      ssidName: session.ssidName,
       username: 'paid_' + sessionId,
       password: sessionId,
       sessionId,
     });
   } catch (err) {
     console.error('[activatePaidSession] Omada auth failed:', err.message);
-    // Leave session active in DB but flag it. Client will see error on next status poll.
-    s.omadaAuthFailed = true;
-    s.updatedAt = new Date().toISOString();
-    sessions.set(sessionId, s);
+    db.prepare(`
+      UPDATE sessions SET omada_auth_failed = TRUE, updated_at = ? WHERE session_id = ?
+    `).run(new Date().toISOString(), sessionId);
   }
 
   return true;
@@ -212,12 +243,15 @@ async function activatePaidSession(sessionId, eventId, amount) {
  * Mark a payment as failed.
  */
 async function markPaymentFailed(sessionId, eventId) {
-  const s = sessions.get(sessionId);
-  if (!s) return false;
-  s.state = 'failed';
-  s.webhookEventId = eventId;
-  s.updatedAt = new Date().toISOString();
-  sessions.set(sessionId, s);
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE sessions
+    SET state = 'failed', webhook_event_id = ?, updated_at = ?
+    WHERE session_id = ?
+  `).run(eventId, now, sessionId);
+
   return true;
 }
 
@@ -226,36 +260,37 @@ async function markPaymentFailed(sessionId, eventId) {
  * Freezes remaining time; timer stops.
  */
 async function pauseSession(sessionId) {
-  const s = sessions.get(sessionId);
-  if (!s || s.state !== 'active') throw new Error('Session not active');
+  const db = getDb();
+  const session = await getSession(sessionId);
+
+  if (!session || session.state !== 'active') {
+    throw new Error('Session not active');
+  }
 
   const now = new Date();
   const remainingSeconds = Math.max(
     0,
-    Math.floor((new Date(s.expiresAt) - now) / 1000)
+    Math.floor((new Date(session.expiresAt) - now) / 1000)
   );
 
-  s.state = 'paused';
-  s.pausedAt = now.toISOString();
-  s.remainingSecondsAtPause = remainingSeconds;
-  s.expiresAt = null; // No longer expires on a fixed date until resumed
-  s.updatedAt = now.toISOString();
-
-  sessions.set(sessionId, s);
+  db.prepare(`
+    UPDATE sessions
+    SET state = 'paused', paused_at = ?, remaining_seconds = ?, expires_at = NULL, updated_at = ?
+    WHERE session_id = ?
+  `).run(now.toISOString(), remainingSeconds, now.toISOString(), sessionId);
 
   // Tell Omada to de-authorize the client
   try {
     await omadaService.unauthenticateClient({
-      clientMac: s.clientMac,
-      apMac: s.apMac,
-      ssidName: s.ssidName,
+      clientMac: session.clientMac,
+      apMac: session.apMac,
+      ssidName: session.ssidName,
     });
   } catch (err) {
     console.warn('[pauseSession] Omada unauth failed:', err.message);
-    // Session is still paused in our DB; client may remain connected for a while.
   }
 
-  return { ...s };
+  return await getSession(sessionId);
 }
 
 /**
@@ -263,20 +298,23 @@ async function pauseSession(sessionId) {
  * Restarts the timer from the remaining seconds.
  */
 async function resumeSession(sessionId) {
-  const s = sessions.get(sessionId);
-  if (!s || s.state !== 'paused') throw new Error('Session not paused');
+  const db = getDb();
+  const session = await getSession(sessionId);
 
-  const now = new Date();
-  const remaining = s.remainingSecondsAtPause || (s.duration || 60) * 60;
-  const expiresAt = new Date(now.getTime() + remaining * 1000);
+  if (!session || session.state !== 'paused') {
+    throw new Error('Session not paused');
+  }
+
+  const remaining = session.remainingSeconds || (session.duration || 60) * 60;
+  const expiresAt = new Date(Date.now() + remaining * 1000).toISOString();
 
   // Re-authenticate via Omada
   try {
     await omadaService.authenticateClient({
-      clientMac: s.clientMac,
-      clientIp: s.clientIp,
-      apMac: s.apMac,
-      ssidName: s.ssidName,
+      clientMac: session.clientMac,
+      clientIp: session.clientIp,
+      apMac: session.apMac,
+      ssidName: session.ssidName,
       username: 'paid_' + sessionId,
       password: sessionId,
       sessionId,
@@ -286,13 +324,13 @@ async function resumeSession(sessionId) {
     throw new Error('Could not reconnect to network. Please try again.');
   }
 
-  s.state = 'active';
-  s.pausedAt = null;
-  s.expiresAt = expiresAt.toISOString();
-  s.updatedAt = now.toISOString();
+  db.prepare(`
+    UPDATE sessions
+    SET state = 'active', paused_at = NULL, expires_at = ?, updated_at = ?
+    WHERE session_id = ?
+  `).run(expiresAt, new Date().toISOString(), sessionId);
 
-  sessions.set(sessionId, s);
-  return { ...s };
+  return await getSession(sessionId);
 }
 
 /**
@@ -300,25 +338,28 @@ async function resumeSession(sessionId) {
  * Reason: 'time_expired', 'admin_expired', 'server_expired'
  */
 async function expireSession(sessionId, reason) {
-  const s = sessions.get(sessionId);
-  if (!s) return false;
+  const db = getDb();
+  const session = await getSession(sessionId);
 
-  if (s.state === 'expired') return false; // Idempotent
+  if (!session) return false;
+  if (session.state === 'expired') return false; // Idempotent
 
-  const prevState = s.state;
-  s.state = 'expired';
-  s.expiredAt = new Date().toISOString();
-  s.expireReason = reason || 'unknown';
-  s.updatedAt = new Date().toISOString();
-  sessions.set(sessionId, s);
+  const prevState = session.state;
+  const now = new Date().toISOString();
 
-  // Call Omada unauth only if session was active or paused (client was connected)
+  db.prepare(`
+    UPDATE sessions
+    SET state = 'expired', expired_at = ?, expire_reason = ?, updated_at = ?
+    WHERE session_id = ?
+  `).run(now, reason || 'unknown', now, sessionId);
+
+  // Call Omada unauth only if session was active or paused
   if (prevState === 'active' || prevState === 'paused') {
     try {
       await omadaService.unauthenticateClient({
-        clientMac: s.clientMac,
-        apMac: s.apMac,
-        ssidName: s.ssidName,
+        clientMac: session.clientMac,
+        apMac: session.apMac,
+        ssidName: session.ssidName,
       });
     } catch (err) {
       console.warn('[expireSession] Omada unauth failed:', err.message);
@@ -332,11 +373,11 @@ async function expireSession(sessionId, reason) {
  * Check if a session is currently active (server-side truth).
  */
 async function isSessionActive(sessionId) {
-  const s = sessions.get(sessionId);
-  if (!s) return false;
-  if (s.state !== 'active') return false;
-  if (s.expiresAt) {
-    return Date.now() < new Date(s.expiresAt).getTime();
+  const session = await getSession(sessionId);
+  if (!session) return false;
+  if (session.state !== 'active') return false;
+  if (session.expiresAt) {
+    return Date.now() < new Date(session.expiresAt).getTime();
   }
   return true;
 }
@@ -345,7 +386,11 @@ async function isSessionActive(sessionId) {
  * Idempotency: check if a webhook event has already been processed.
  */
 async function isEventProcessed(eventId) {
-  return webhookEvents.has(eventId);
+  const db = getDb();
+  const row = db.prepare(`
+    SELECT id FROM webhook_events WHERE event_id = ? LIMIT 1
+  `).get(eventId);
+  return Boolean(row);
 }
 
 /**
@@ -353,7 +398,13 @@ async function isEventProcessed(eventId) {
  */
 async function markEventProcessed(eventId, sessionId) {
   if (!eventId) return false;
-  webhookEvents.set(eventId, { sessionId, processedAt: new Date().toISOString() });
+
+  const db = getDb();
+  db.prepare(`
+    INSERT OR IGNORE INTO webhook_events (event_id, session_id, created_at)
+    VALUES (?, ?, CURRENT_TIMESTAMP)
+  `).run(eventId, sessionId || null);
+
   return true;
 }
 
@@ -366,22 +417,20 @@ function startExpirationWorker() {
   if (expirationTimer) return; // Already running
 
   expirationTimer = setInterval(async () => {
-    const now = Date.now();
-    let expiredCount = 0;
+    const db = getDb();
+    const now = new Date().toISOString();
 
-    for (const [sessionId, session] of sessions.entries()) {
-      if (session.state !== 'active') continue;
-      if (!session.expiresAt) continue;
+    const expiredSessions = db.prepare(`
+      SELECT session_id FROM sessions
+      WHERE state = 'active' AND expires_at IS NOT NULL AND expires_at <= ?
+    `).all(now);
 
-      const expiresAt = new Date(session.expiresAt).getTime();
-      if (now >= expiresAt) {
-        await expireSession(sessionId, 'time_expired');
-        expiredCount++;
-      }
+    for (const row of expiredSessions) {
+      await expireSession(row.session_id, 'time_expired');
     }
 
-    if (expiredCount > 0) {
-      console.log(`[expiration-worker] Expired ${expiredCount} session(s)`);
+    if (expiredSessions.length > 0) {
+      console.log(`[expiration-worker] Expired ${expiredSessions.length} session(s)`);
     }
   }, EXPIRE_CHECK_INTERVAL);
 
@@ -396,15 +445,6 @@ function stopExpirationWorker() {
     clearInterval(expirationTimer);
     expirationTimer = null;
   }
-}
-
-/**
- * Reset all sessions (for testing).
- */
-function _resetAll() {
-  sessions.clear();
-  webhookEvents.clear();
-  stopExpirationWorker();
 }
 
 module.exports = {
@@ -423,7 +463,4 @@ module.exports = {
   startExpirationWorker,
   stopExpirationWorker,
   normalizeMac,
-  _resetAll,
-  _sessions: sessions,
-  _webhookEvents: webhookEvents,
 };
