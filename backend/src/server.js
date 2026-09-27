@@ -31,6 +31,19 @@ const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:8080';
 // ── Security middleware ──────────────────────────────────────
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https://images.unsplash.com", "https:"],
+      styleSrc: ["'self'", "https:", "'unsafe-inline'"],
+      fontSrc: ["'self'", "https:", "data:"],
+      formAction: ["'self'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'self'"],
+      objectSrc: ["'none'"],
+    },
+  },
 }));
 
 // CORS: restrict to known portal origin
