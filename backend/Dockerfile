@@ -1,8 +1,12 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
 # Install dependencies first (layer caching)
+# --omit=dev skips jest, nodemon, supertest
+# better-sqlite3 needs native build tools but is only used for local dev
+RUN apk add --no-cache python3 make g++
+
 COPY package*.json ./
 RUN npm ci --omit=dev
 
