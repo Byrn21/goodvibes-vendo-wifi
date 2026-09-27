@@ -187,6 +187,15 @@
             <p id="terms-error" class="form-error hidden" role="alert"></p>
           </div>
 
+          <!-- Plan selector (paid mode) -->
+          <div id="plan-section" class="form-group hidden">
+            <label for="plan-select" class="form-label">Select Duration</label>
+            <select id="plan-select" class="form-select" name="plan" aria-describedby="plan-hint">
+              <option value="">— Choose a plan —</option>
+            </select>
+            <p id="plan-hint" class="form-hint" aria-live="polite"></p>
+          </div>
+
           <div id="form-error" class="form-error-box hidden" role="alert" aria-live="assertive"></div>
 
           <button
@@ -203,8 +212,76 @@
           <p id="submit-hint" class="form-hint form-hint--centered">
             By connecting, you agree to our acceptable use policy.
           </p>
-        </form>
-      </section>
+          </form>
+
+          <!-- Payment method tiles (paid mode) -->
+          <div class="payment-section">
+            <div class="auth-divider" role="separator" aria-hidden="true">Or pay with</div>
+            <div class="payment-tiles" role="group" aria-label="Payment methods">
+
+              <!-- GCash -->
+              <button
+                type="button"
+                class="payment-tile"
+                data-payment="gcash"
+                aria-label="Pay with GCash"
+              >
+                <div class="payment-tile__icon-wrap" aria-hidden="true">
+                  <img
+                    class="payment-tile__logo"
+                    src="assets/images/gcash.png"
+                    alt="GCash logo"
+                    width="40"
+                    height="40"
+                    loading="lazy"
+                  />
+                </div>
+                <span class="payment-tile__name">GCash</span>
+              </button>
+
+              <!-- Maya -->
+              <button
+                type="button"
+                class="payment-tile"
+                data-payment="maya"
+                aria-label="Pay with Maya"
+              >
+                <div class="payment-tile__icon-wrap" aria-hidden="true">
+                  <img
+                    class="payment-tile__logo"
+                    src="assets/images/maya.png"
+                    alt="Maya logo"
+                    width="40"
+                    height="40"
+                    loading="lazy"
+                  />
+                </div>
+                <span class="payment-tile__name">Maya</span>
+              </button>
+
+              <!-- QR Ph -->
+              <button
+                type="button"
+                class="payment-tile"
+                data-payment="qrph"
+                aria-label="Pay with QR Ph"
+              >
+                <div class="payment-tile__icon-wrap" aria-hidden="true">
+                  <img
+                    class="payment-tile__logo"
+                    src="assets/images/qrph.png"
+                    alt="QR Ph logo"
+                    width="40"
+                    height="40"
+                    loading="lazy"
+                  />
+                </div>
+                <span class="payment-tile__name">QR Ph</span>
+              </button>
+
+            </div><!-- /.payment-tiles -->
+          </div>
+        </section>
 
       <footer class="portal-footer" role="contentinfo">
         <p class="support-info" id="support-info">

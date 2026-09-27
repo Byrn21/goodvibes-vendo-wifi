@@ -1,34 +1,179 @@
 /**
- * db/client.js — SQLite database client
+ * db/client.js — Database client (dual-mode: SQLite for dev, PostgreSQL for Render)
  *
- * Singleton SQLite connection for the application.
- * Uses better-sqlite3 for synchronous, fast queries.
+ * Provides a unified async interface that works with both:
+ *   - SQLite (via better-sqlite3) for local development
+ *   - PostgreSQL (via pg) for Render.com production
+ *
+ * The session/service layer calls `db.query(sql, params)` and
+ * `db.getOne(sql, params)` — never touching driver-specific APIs.
  */
 
 const Database = require('better-sqlite3');
+const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs');
 
 const DATABASE_URL = process.env.DATABASE_URL || 'sqlite:./data/portal.db';
-const dbPath = DATABASE_URL.replace('sqlite:', '');
-const absolutePath = path.resolve(dbPath);
 
 let db = null;
 
 /**
+ * Detect database backend from DATABASE_URL.
+ */
+function isPostgres() {
+  return DATABASE_URL.startsWith('postgresql://') || DATABASE_URL.startsWith('postgres://');
+}
+
+/**
+ * Convert SQLite-style ? placeholders to PostgreSQL $1, $2, ... params.
+ * Only applies to PostgreSQL; SQLite keeps ? as-is.
+ */
+function convertPlaceholders(sql) {
+  if (!isPostgres()) return sql;
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
+}
+
+/**
  * Get or create the database connection.
+ * Returns a wrapper that provides a unified async query interface.
  */
 function getDb() {
   if (db) return db;
+
+  if (isPostgres()) {
+    return createPgPool();
+  }
+
+  return createSqliteDb();
+}
+
+/**
+ * Create a PostgreSQL connection pool.
+ */
+function createPgPool() {
+  const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production'
+      ? { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false' }
+      : false,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  });
+
+  // Verify connection on startup
+  pool.query('SELECT 1').catch(err => {
+    console.error('[db] PostgreSQL connection error:', err.message);
+    process.exit(1);
+  });
+
+  // Unified async wrapper
+  db = {
+    _driver: 'pg',
+    _pool: pool,
+
+        /** @returns {Promise<Array>} rows from query */
+    async query(sql, params = []) {
+      const pgSql = convertPlaceholders(sql);
+      const result = await pool.query(pgSql, params);
+      return result.rows;
+    },
+
+    /** @returns {Promise<Object|undefined>} single row or undefined */
+    async getOne(sql, params = []) {
+      const rows = await db.query(sql, params);
+      return rows[0];
+    },
+
+    /** @returns {Promise<Object>} result with rowCount */
+    async run(sql, params = []) {
+      const pgSql = convertPlaceholders(sql);
+      const result = await pool.query(pgSql, params);
+      return {
+        rowCount: result.rowCount,
+        rows: result.rows,
+        insertId: result.rows[0]?.id || result.rows[0]?.session_id || null,
+      };
+    },
+
+    /** @returns {Promise<void>} */
+    async exec(sql) {
+      await pool.query(sql);
+    },
+
+    /** Close the pool */
+    async close() {
+      await pool.end();
+      db = null;
+    },
+
+    // Expose for transactions if needed
+    get pool() { return pool; },
+  };
+
+  return db;
+}
+
+/**
+ * Create a SQLite database with a unified async-style wrapper.
+ * better-sqlite3 is synchronous, but we wrap it to match the pg interface.
+ */
+function createSqliteDb() {
+  const dbPath = DATABASE_URL.replace('sqlite:', '');
+  const absolutePath = path.resolve(dbPath);
 
   const dbDir = path.dirname(absolutePath);
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
   }
 
-  db = new Database(absolutePath);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
+  const sqliteDb = new Database(absolutePath);
+  sqliteDb.pragma('journal_mode = WAL');
+  sqliteDb.pragma('foreign_keys = ON');
+
+  // Convert ? placeholders — SQLite uses ? natively, so no conversion needed
+  db = {
+    _driver: 'sqlite',
+    _sqliteDb: sqliteDb,
+
+    /** @returns {Promise<Array>} rows from query */
+    async query(sql, params = []) {
+      const stmt = sqliteDb.prepare(sql);
+      return stmt.all(...params);
+    },
+
+    /** @returns {Promise<Object|undefined>} single row or undefined */
+    async getOne(sql, params = []) {
+      const stmt = sqliteDb.prepare(sql);
+      return stmt.get(...params);
+    },
+
+    /** @returns {Promise<Object>} result with rowCount and insertId */
+    async run(sql, params = []) {
+      const stmt = sqliteDb.prepare(sql);
+      const info = stmt.run(...params);
+      return {
+        rowCount: info.changes,
+        insertId: info.lastInsertRowid,
+      };
+    },
+
+    /** @returns {Promise<void>} */
+    async exec(sql) {
+      sqliteDb.exec(sql);
+    },
+
+    /** Close the database */
+    async close() {
+      sqliteDb.close();
+      db = null;
+    },
+
+    // Expose raw SQLite instance for direct pragma access if needed
+    get raw() { return sqliteDb; },
+  };
 
   return db;
 }
@@ -36,10 +181,9 @@ function getDb() {
 /**
  * Close the database connection.
  */
-function closeDb() {
+async function closeDb() {
   if (db) {
-    db.close();
-    db = null;
+    await db.close();
   }
 }
 

@@ -29,18 +29,18 @@ function normalizeMac(mac) {
 }
 
 /**
- * Validate a free voucher against database.
- * @returns { valid: boolean, code?: string, duration?: number, message?: string }
+ * validateVoucher — Validate a voucher code against the database.
+ * Returns { valid, code, duration, message }
  */
 async function validateVoucher(voucher, clientMac) {
   const db = getDb();
 
-  const row = db.prepare(`
+  const row = await db.getOne(`
     SELECT id, code, duration_minutes, state, used_by_mac, expires_at
     FROM vouchers
-    WHERE code = ? COLLATE NOCASE
+    WHERE code = ? 
     LIMIT 1
-  `).get(voucher);
+  `, [voucher]);
 
   if (!row) {
     return { valid: false, code: 'INVALID_VOUCHER', message: 'Invalid voucher code.' };
@@ -62,24 +62,23 @@ async function validateVoucher(voucher, clientMac) {
   if (row.expires_at) {
     const expiresAt = new Date(row.expires_at);
     if (Date.now() > expiresAt.getTime()) {
-      // Mark as expired
-      db.prepare(`UPDATE vouchers SET state = 'expired' WHERE id = ?`).run(row.id);
+      await db.run(`UPDATE vouchers SET state = 'expired' WHERE id = ?`, [row.id]);
       return { valid: false, code: 'EXPIRED_VOUCHER', message: 'This voucher has expired.' };
     }
   }
 
   // Mark voucher as used
-  db.prepare(`
+  await db.run(`
     UPDATE vouchers
     SET state = 'used', used_by_mac = ?, used_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(clientMac || '', row.id);
+  `, [clientMac || '', row.id]);
 
   return { valid: true, duration: row.duration_minutes, message: 'Voucher accepted.' };
 }
 
 /**
- * Record a new active session in the database.
+ * recordSession — Record a new active session in the database.
  */
 async function recordSession({
   sessionId, clientMac, clientIp, apMac, ssidName,
@@ -89,13 +88,13 @@ async function recordSession({
   const now = new Date().toISOString();
   const expiresAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
 
-  db.prepare(`
+  await db.run(`
     INSERT INTO sessions (
       session_id, client_mac, client_ip, ap_mac, ssid_name,
       duration_minutes, started_at, expires_at, state,
       voucher_used, created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
-  `).run(
+  `, [
     sessionId,
     clientMac || '',
     clientIp || '',
@@ -106,21 +105,21 @@ async function recordSession({
     expiresAt,
     voucherUsed || null,
     now,
-    now
-  );
+    now,
+  ]);
 
   return await getSession(sessionId);
 }
 
 /**
- * Get a session by ID.
+ * getSession — Get a session by ID.
  */
 async function getSession(sessionId) {
   const db = getDb();
 
-  const row = db.prepare(`
+  const row = await db.getOne(`
     SELECT * FROM sessions WHERE session_id = ? LIMIT 1
-  `).get(sessionId);
+  `, [sessionId]);
 
   if (!row) return null;
 
@@ -159,7 +158,7 @@ async function getSession(sessionId) {
 }
 
 /**
- * Expire session — deactivate via Omada and mark expired in DB.
+ * expireSession — Deactivate via Omada and mark expired in DB.
  */
 async function expireSession(sessionId, reason = 'time_expired') {
   const db = getDb();
@@ -171,11 +170,11 @@ async function expireSession(sessionId, reason = 'time_expired') {
   const prevState = session.state;
   const now = new Date().toISOString();
 
-  db.prepare(`
+  await db.run(`
     UPDATE sessions
     SET state = 'expired', expired_at = ?, expire_reason = ?, updated_at = ?
     WHERE session_id = ?
-  `).run(now, reason || 'unknown', now, sessionId);
+  `, [now, reason || 'unknown', now, sessionId]);
 
   // Call Omada unauth only if session was active or paused
   if (prevState === 'active' || prevState === 'paused') {
@@ -194,8 +193,8 @@ async function expireSession(sessionId, reason = 'time_expired') {
 }
 
 /**
- * Pause an active session.
- * Freezes remaining time; timer stops.
+ * pauseSession — Freeze an active session's timer.
+ * Omada unauthenticates the client; time is stored in remaining_seconds.
  */
 async function pauseSession(sessionId) {
   const db = getDb();
@@ -211,11 +210,11 @@ async function pauseSession(sessionId) {
     Math.floor((new Date(session.expiresAt) - now) / 1000)
   );
 
-  db.prepare(`
+  await db.run(`
     UPDATE sessions
     SET state = 'paused', paused_at = ?, remaining_seconds = ?, expires_at = NULL, updated_at = ?
     WHERE session_id = ?
-  `).run(now.toISOString(), remainingSeconds, now.toISOString(), sessionId);
+  `, [now.toISOString(), remainingSeconds, now.toISOString(), sessionId]);
 
   // Tell Omada to de-authorize the client
   try {
@@ -232,7 +231,7 @@ async function pauseSession(sessionId) {
 }
 
 /**
- * Resume a paused session.
+ * resumeSession — Restart a paused session.
  * Restarts the timer from the remaining seconds.
  */
 async function resumeSession(sessionId) {
@@ -262,49 +261,13 @@ async function resumeSession(sessionId) {
     throw new Error('Could not reconnect to network. Please try again.');
   }
 
-  db.prepare(`
+  await db.run(`
     UPDATE sessions
     SET state = 'active', paused_at = NULL, expires_at = ?, updated_at = ?
     WHERE session_id = ?
-  `).run(expiresAt, new Date().toISOString(), sessionId);
+  `, [expiresAt, new Date().toISOString(), sessionId]);
 
-  return await getSession(sessionId);
-}
-
-/**
- * Expire a session — server-side enforcement.
- * Reason: 'time_expired', 'admin_expired', 'server_expired'
- */
-async function expireSession(sessionId, reason) {
-  const db = getDb();
-  const session = await getSession(sessionId);
-
-  if (!session) return false;
-  if (session.state === 'expired') return false; // Idempotent
-
-  const prevState = session.state;
-  const now = new Date().toISOString();
-
-  db.prepare(`
-    UPDATE sessions
-    SET state = 'expired', expired_at = ?, expire_reason = ?, updated_at = ?
-    WHERE session_id = ?
-  `).run(now, reason || 'unknown', now, sessionId);
-
-  // Call Omada unauth only if session was active or paused
-  if (prevState === 'active' || prevState === 'paused') {
-    try {
-      await omadaService.unauthenticateClient({
-        clientMac: session.clientMac,
-        apMac: session.apMac,
-        ssidName: session.ssidName,
-      });
-    } catch (err) {
-      console.warn('[expireSession] Omada unauth failed:', err.message);
-    }
-  }
-
-  return true;
+    return await getSession(sessionId);
 }
 
 /**
@@ -317,13 +280,13 @@ async function isSessionActive(sessionId) {
   if (session.expiresAt) {
     return Date.now() < new Date(session.expiresAt).getTime();
   }
-  return true;
+    return true;
 }
 
 /**
- * Background expiration worker.
- * Checks all active sessions every EXPIRE_CHECK_INTERVAL.
- * Calls Omada unauth for any that have expired.
+ * startExpirationWorker — Background timer that expires sessions server-side.
+ * Queries for active sessions whose expires_at has passed, then calls
+ * Omada unauth and marks them expired. Runs every EXPIRE_CHECK_INTERVAL ms.
  */
 function startExpirationWorker() {
   if (expirationTimer) return; // Already running
@@ -332,10 +295,10 @@ function startExpirationWorker() {
     const db = getDb();
     const now = new Date().toISOString();
 
-    const expiredSessions = db.prepare(`
+    const expiredSessions = await db.query(`
       SELECT session_id FROM sessions
       WHERE state = 'active' AND expires_at IS NOT NULL AND expires_at <= ?
-    `).all(now);
+    `, [now]);
 
     for (const row of expiredSessions) {
       await expireSession(row.session_id, 'time_expired');
@@ -353,9 +316,120 @@ function startExpirationWorker() {
 }
 
 function stopExpirationWorker() {
-  if (expirationTimer) {
+    if (expirationTimer) {
     clearInterval(expirationTimer);
     expirationTimer = null;
+  }
+}
+
+/**
+ * markPaymentPending — Set session state to pending_payment with provider session ID.
+ */
+async function markPaymentPending(sessionId, providerSessionId) {
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  await db.run(`
+    UPDATE sessions
+    SET state = 'pending_payment',
+        provider_session_id = ?,
+        updated_at = ?
+    WHERE session_id = ?
+  `, [providerSessionId || null, now, sessionId]);
+
+  return await getSession(sessionId);
+}
+
+/**
+ * activatePaidSession — Activate a session after successful payment.
+ * Sets state to 'active', records payment details, and authenticates via Omada.
+ */
+async function activatePaidSession(sessionId, eventId, amount) {
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  // Compute expiry from existing duration
+  const session = await getSession(sessionId);
+  if (!session) {
+    throw new Error('Session not found for payment activation');
+  }
+
+  const duration = session.duration;
+  const expiresAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
+  const username = 'paid_' + sessionId;
+
+  // Authenticate via Omada
+  await omadaService.authenticateClient({
+    clientMac: session.clientMac,
+    clientIp:  session.clientIp,
+    apMac:     session.apMac,
+    ssidName:  session.ssidName,
+    username:  username,
+    password:  sessionId,
+    sessionId: sessionId,
+  });
+
+  await db.run(`
+    UPDATE sessions
+    SET state = 'active',
+        payment_event_id = ?,
+        payment_amount = ?,
+        started_at = ?,
+        expires_at = ?,
+        updated_at = ?
+    WHERE session_id = ?
+  `, [eventId || null, amount || null, now, expiresAt, now, sessionId]);
+
+  return await getSession(sessionId);
+}
+
+/**
+ * markPaymentFailed — Mark a session's payment as failed.
+ */
+async function markPaymentFailed(sessionId, eventId) {
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  await db.run(`
+    UPDATE sessions
+    SET state = 'payment_failed',
+        payment_event_id = ?,
+        updated_at = ?
+    WHERE session_id = ?
+  `, [eventId || null, now, sessionId]);
+
+  return await getSession(sessionId);
+}
+
+/**
+ * isEventProcessed — Check if a webhook event has already been processed.
+ */
+async function isEventProcessed(eventId) {
+  const db = getDb();
+  const row = await db.getOne(`
+    SELECT 1 FROM webhook_events WHERE event_id = ? LIMIT 1
+  `, [eventId]);
+  return !!row;
+}
+
+/**
+ * markEventProcessed — Record a processed webhook event for idempotency.
+ */
+async function markEventProcessed(eventId, sessionId) {
+  const db = getDb();
+  const now = new Date().toISOString();
+
+  try {
+    await db.run(`
+      INSERT INTO webhook_events (event_id, session_id, processed_at)
+      VALUES (?, ?, ?)
+    `, [eventId, sessionId || null, now]);
+  } catch (err) {
+    // Unique violation — event already recorded, skip (idempotent)
+    if (err.code === '23505' || err.code === 'SQLITE_CONSTRAINT') {
+      return;
+    }
+    throw err;
   }
 }
 
@@ -370,4 +444,9 @@ module.exports = {
   startExpirationWorker,
   stopExpirationWorker,
   normalizeMac,
+  markPaymentPending,
+  activatePaidSession,
+  markPaymentFailed,
+  isEventProcessed,
+  markEventProcessed,
 };

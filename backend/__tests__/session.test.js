@@ -1,4 +1,4 @@
-/**
+﻿/**
  * __tests__/session.test.js
  * Unit tests for session state machine, countdown math, and voucher
  * validation against the SQLite-backed session service.
@@ -15,31 +15,41 @@ process.env.DATABASE_URL = 'sqlite:' + path.join(TEST_DB_DIR, 'test.db');
 const sessionService = require('../src/services/session');
 const { getDb, closeDb } = require('../src/db/client');
 
-function applySchema() {
+async function applySchema() {
   const schema = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'db', 'schema.sql'),
     'utf8'
   );
-  getDb().exec(schema);
+  await getDb().exec(schema);
 }
 
-function seedVouchers() {
-  const db = getDb();
-  const insert = db.prepare(`
-    INSERT INTO vouchers (code, duration_minutes, state)
-    VALUES (?, ?, ?)
-  `);
-  insert.run('WIFI-TEST-0001', 60, 'active');
-  insert.run('EXPIRED-VOUCHER', 60, 'expired');
-  insert.run('USED-VOUCHER', 60, 'used');
+async function seedVouchers() {
+  const voucherData = [
+    ['WIFI-TEST-0001', 60, 'active'],
+    ['EXPIRED-VOUCHER', 60, 'expired'],
+    ['USED-VOUCHER', 60, 'used'],
+  ];
+
+  for (const v of voucherData) {
+    try {
+      await getDb().run(
+        'INSERT INTO vouchers (code, duration_minutes, state) VALUES (?, ?, ?)',
+        v
+      );
+    } catch (err) {
+      if (err.code !== '23505' && err.code !== 'SQLITE_CONSTRAINT') {
+        throw err;
+      }
+    }
+  }
 }
 
-beforeAll(() => {
-  applySchema();
+beforeAll(async () => {
+  await applySchema();
 });
 
-afterAll(() => {
-  closeDb();
+afterAll(async () => {
+  await closeDb();
   try {
     fs.rmSync(TEST_DB_DIR, { recursive: true, force: true });
   } catch (err) {
@@ -47,10 +57,9 @@ afterAll(() => {
   }
 });
 
-beforeEach(() => {
-  const db = getDb();
-  db.exec('DELETE FROM sessions; DELETE FROM vouchers;');
-  seedVouchers();
+beforeEach(async () => {
+  await getDb().exec('DELETE FROM sessions; DELETE FROM vouchers;');
+  await seedVouchers();
 });
 
 describe('Session State Machine', () => {
@@ -84,9 +93,10 @@ describe('Session State Machine', () => {
     });
 
     // Manually fast-forward expiresAt in the DB (30 min left)
-    const db = getDb();
-    db.prepare(`UPDATE sessions SET expires_at = ? WHERE session_id = ?`)
-      .run(new Date(Date.now() + 1800 * 1000).toISOString(), 'sess_pause_001');
+    await getDb().run(
+      'UPDATE sessions SET expires_at = ? WHERE session_id = ?',
+      [new Date(Date.now() + 1800 * 1000).toISOString(), 'sess_pause_001']
+    );
 
     const paused = await sessionService.pauseSession('sess_pause_001');
     expect(paused.state).toBe('paused');
@@ -102,13 +112,11 @@ describe('Session State Machine', () => {
       duration: 60,
     });
 
-    // Force the session into a paused state with 1500s remaining
-    const db = getDb();
-    db.prepare(`
-      UPDATE sessions
-      SET state = 'paused', paused_at = ?, remaining_seconds = 1500, expires_at = NULL
-      WHERE session_id = ?
-    `).run(new Date().toISOString(), 'sess_resume_001');
+        // Force the session into a paused state with 1500s remaining
+    await getDb().run(
+      `UPDATE sessions SET state = 'paused', paused_at = ?, remaining_seconds = 1500, expires_at = NULL WHERE session_id = ?`,
+      [new Date().toISOString(), 'sess_resume_001']
+    );
 
     const resumed = await sessionService.resumeSession('sess_resume_001');
     expect(resumed.state).toBe('active');
@@ -128,7 +136,7 @@ describe('Session State Machine', () => {
     });
 
     await sessionService.expireSession('sess_expire_001');
-    await sessionService.expireSession('sess_expire_001'); // second call — idempotent
+    await sessionService.expireSession('sess_expire_001'); // second call â€” idempotent
 
     const s = await sessionService.getSession('sess_expire_001');
     expect(s.state).toBe('expired');
@@ -156,10 +164,11 @@ describe('Session Expiration Math', () => {
       duration: 60,
     });
 
-    // Manually set expiresAt to 30 min from now
-    const db = getDb();
-    db.prepare(`UPDATE sessions SET expires_at = ? WHERE session_id = ?`)
-      .run(new Date(Date.now() + 1800 * 1000).toISOString(), 'sess_remaining_001');
+        // Manually set expiresAt to 30 min from now
+    await getDb().run(
+      'UPDATE sessions SET expires_at = ? WHERE session_id = ?',
+      [new Date(Date.now() + 1800 * 1000).toISOString(), 'sess_remaining_001']
+    );
 
     const retrieved = await sessionService.getSession('sess_remaining_001');
     expect(retrieved.state).toBe('active');
@@ -174,13 +183,11 @@ describe('Session Expiration Math', () => {
       duration: 60,
     });
 
-    // Manually pause the session with 3600s frozen
-    const db = getDb();
-    db.prepare(`
-      UPDATE sessions
-      SET state = 'paused', paused_at = ?, remaining_seconds = 3600, expires_at = NULL
-      WHERE session_id = ?
-    `).run(new Date().toISOString(), 'sess_paused_remaining');
+        // Manually pause the session with 3600s frozen
+    await getDb().run(
+      `UPDATE sessions SET state = 'paused', paused_at = ?, remaining_seconds = 3600, expires_at = NULL WHERE session_id = ?`,
+      [new Date().toISOString(), 'sess_paused_remaining']
+    );
 
     const retrieved = await sessionService.getSession('sess_paused_remaining');
     expect(retrieved.state).toBe('paused');
@@ -195,7 +202,7 @@ describe('Session Expiration Math', () => {
 
 describe('Countdown Display Math', () => {
   function formatDuration(totalSecs) {
-    if (totalSecs == null || totalSecs < 0) return '—';
+    if (totalSecs == null || totalSecs < 0) return 'â€”';
     var h = Math.floor(totalSecs / 3600);
     var m = Math.floor((totalSecs % 3600) / 60);
     var s = totalSecs % 60;
@@ -217,12 +224,12 @@ describe('Countdown Display Math', () => {
   });
 
   test('returns dash for null/undefined', () => {
-    expect(formatDuration(null)).toBe('—');
-    expect(formatDuration(undefined)).toBe('—');
+    expect(formatDuration(null)).toBe('â€”');
+    expect(formatDuration(undefined)).toBe('â€”');
   });
 
   test('handles negative as zero', () => {
-    expect(formatDuration(-10)).toBe('—'); // our function guards < 0
+    expect(formatDuration(-10)).toBe('â€”'); // our function guards < 0
   });
 });
 

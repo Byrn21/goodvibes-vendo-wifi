@@ -6,10 +6,7 @@
  */
 
 require('dotenv').config();
-const path = require('path');
-const Database = require('better-sqlite3');
-
-const DATABASE_URL = process.env.DATABASE_URL || 'sqlite:./data/portal.db';
+const { getDb, closeDb } = require('./client');
 
 async function seed() {
   if (process.env.NODE_ENV === 'production') {
@@ -27,27 +24,30 @@ async function seed() {
     { code: 'USED-VOUCHER',    duration: 60,  state: 'used' },
   ];
 
-  if (!DATABASE_URL.startsWith('sqlite:')) {
-    throw new Error('Only SQLite is supported. DATABASE_URL must start with sqlite:');
+  const db = getDb();
+
+  for (const v of vouchers) {
+    // INSERT OR IGNORE (SQLite) / ON CONFLICT DO NOTHING (PostgreSQL)
+    // The db client's run() handles placeholder conversion;
+    // we use INSERT OR IGNORE which works in SQLite. For PostgreSQL,
+    // we catch the unique violation error instead.
+    try {
+      await db.run(
+        'INSERT OR IGNORE INTO vouchers (code, duration_minutes, state) VALUES (?, ?, ?)',
+        [v.code, v.duration, v.state]
+      );
+    } catch (err) {
+      // Unique violation — voucher already exists, skip
+      if (err.code === '23505' || err.code === 'SQLITE_CONSTRAINT') {
+        // Skip duplicate — expected for re-runs
+      } else {
+        throw err;
+      }
+    }
   }
 
-  const dbPath = DATABASE_URL.replace('sqlite:', '');
-  const absolutePath = path.resolve(dbPath);
-  const db = new Database(absolutePath);
-  db.pragma('journal_mode = WAL');
-
-  const insert = db.prepare(`
-    INSERT OR IGNORE INTO vouchers (code, duration_minutes, state)
-    VALUES (?, ?, ?)
-  `);
-
-  const insertMany = db.transaction((rows) => {
-    for (const v of rows) insert.run(v.code, v.duration, v.state);
-  });
-
-  insertMany(vouchers);
-  console.log('[seed] Inserted', vouchers.length, 'vouchers into SQLite.');
-  db.close();
+  console.log('[seed] Inserted', vouchers.length, 'vouchers.');
+  await closeDb();
 }
 
 seed().catch(err => {

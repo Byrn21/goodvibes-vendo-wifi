@@ -1,13 +1,13 @@
-/**
- * config.js — Omada Captive Portal Frontend Configuration
+﻿/**
+ * config.js â€” Omada Captive Portal Frontend Configuration
  *
  * Copy this file to config/config.js (keep config.example.js as a template).
  *
  * SECRETS AND CREDENTIALS MUST NEVER BE PLACED IN THIS FILE.
  * This file ships inside portal-upload.zip.
  *
- * Values marked ⚠️ MUST be verified against your specific controller firmware
- * version before deployment. See README.md §Controller-Specific Values.
+ * Values marked âš ï¸ MUST be verified against your specific controller firmware
+ * version before deployment. See README.md Â§Controller-Specific Values.
  */
 
 (function () {
@@ -16,11 +16,11 @@
   window.CONFIG = {
 
     // ==============================================================
-    // BRANDING — Replace these with your organization's details
+    // BRANDING â€” Replace these with your organization's details
     // ==============================================================
     brandName: 'Hotel WiFi Portal',
     brandTagline: 'Connect to our Guest Network',
-    // Path relative to index.html. Keep local — no external URLs.
+    // Path relative to index.html. Keep local â€” no external URLs.
     logoUrl: 'assets/images/logo.svg',
     // CSS color value (hex, rgb, hsl)
     primaryColor: '#1a73e8',
@@ -32,24 +32,24 @@
     // ==============================================================
     // AUTHENTICATION MODE
     // ==============================================================
-    // 'direct'  — Form POST directly to the Omada controller extPortal endpoint.
+    // 'direct'  â€” Form POST directly to the Omada controller extPortal endpoint.
     //              Works for free voucher mode without a backend.
-    //              ⚠️ CORS: Some Omada controllers block cross-origin POSTs.
+    //              âš ï¸ CORS: Some Omada controllers block cross-origin POSTs.
     //              Prefer 'backend' mode for reliable operation.
     //
-    // 'backend' — JavaScript fetch() POST to your backend /api/auth.
+    // 'backend' â€” JavaScript fetch() POST to your backend /api/auth.
     //              Backend proxies to Omada. Supports voucher-based sessions.
     mode: 'direct',
 
     // ==============================================================
     // DIRECT MODE (mode: 'direct')
-    // ⚠️ Verify every value in this section with your controller.
+    // âš ï¸ Verify every value in this section with your controller.
     // ==============================================================
 
     // The Omada controller's external portal authentication endpoint.
     // Format: https://<controller-ip>:<port>/extPortal/auth
     // Common ports: 8043 (HTTPS), 8080 (HTTP), 8043 (Omada app-based)
-    // ⚠️ Some controllers use /api/v2/extPortal/auth or /extPortal/auth.htm
+    // âš ï¸ Some controllers use /api/v2/extPortal/auth or /extPortal/auth.htm
     authEndpoint: 'https://192.168.1.252:8043/extPortal/auth',
 
     // HTTP method for the direct POST.
@@ -58,12 +58,12 @@
     authMethod: 'POST',
 
     // Fixed fields to include in the direct-mode POST body.
-    // ⚠️ These field NAMES vary by Omada version. Common alternatives:
+    // âš ï¸ These field NAMES vary by Omada version. Common alternatives:
     //   username/password vs. token/mac vs. key/value vs. voucher/token
     //   Always capture a real redirect request to confirm the exact field names.
     authParams: {
-      username: 'voucher',   // maps voucher input → body[username]
-      password: 'voucher',  // maps voucher input → body[password]
+      username: 'voucher',   // maps voucher input â†’ body[username]
+      password: 'voucher',  // maps voucher input â†’ body[password]
       // clientMac and clientIp are auto-included from query params
       // Add any additional fixed fields your controller requires here
     },
@@ -73,10 +73,10 @@
     // ==============================================================
 
     // Base URL of your backend server (no trailing slash)
-    apiBaseUrl: 'https://api.your-domain.com',
+    apiBaseUrl: 'https://your-app-name.onrender.com',
 
     // ==============================================================
-    // VOUCHER VALIDATION (frontend hints only — backend enforces)
+    // VOUCHER VALIDATION (frontend hints only â€” backend enforces)
     // ==============================================================
     voucher: {
       required: true,
@@ -84,13 +84,13 @@
       maxLength: 16,
       // Allow letters, numbers, and common voucher separators
       pattern: /^[A-Z0-9]+$/i,
-      patternHint: 'Letters and numbers only, 8–16 characters',
+      patternHint: 'Letters and numbers only, 8â€“16 characters',
     },
 
     // ==============================================================
     // REDIRECT ALLOWLIST
     // After successful auth, users are redirected here.
-    // ⚠️ Must include any domains you want users to reach post-auth.
+    // âš ï¸ Must include any domains you want users to reach post-auth.
     //    Empty array = allow any http/https URL (not recommended).
     // ==============================================================
     allowedRedirectDomains: [
@@ -102,7 +102,7 @@
     ],
 
     // Fallback destination if no original URL is captured.
-    // ⚠️ Must be a valid https:// URL or localhost for dev.
+    // âš ï¸ Must be a valid https:// URL or localhost for dev.
     defaultRedirectUrl: 'https://www.example.com/welcome',
 
     // ==============================================================
@@ -123,19 +123,19 @@
 
     // ==============================================================
     // CONTROLLER QUERY PARAMETER MAPPING
-    // ⚠️  These are the most common names. Your controller version may differ.
+    // âš ï¸  These are the most common names. Your controller version may differ.
     //      Inspect the actual redirect URL from your AP to confirm.
     //
     // Common variations:
-    //   clientMac  → mac, clientmac, usermac, client_mac
-    //   clientIp   → ip, clientip, userip, client_ip
-    //   apMac      → apmac, acmac, ap_mac
-    //   ssidName   → ssid, wlan, ssidname, wlan_name, WLANName
-    //   redirectUrl→ redirect, url, target, dst, go, targetUrl, u
+    //   clientMac  â†’ mac, clientmac, usermac, client_mac
+    //   clientIp   â†’ ip, clientip, userip, client_ip
+    //   apMac      â†’ apmac, acmac, ap_mac
+    //   ssidName   â†’ ssid, wlan, ssidname, wlan_name, WLANName
+    //   redirectUrlâ†’ redirect, url, target, dst, go, targetUrl, u
     //   Controller-specific tokens may appear as: token, ap_session, sessid, sid
     // ==============================================================
     paramMap: {
-      // Our canonical name → Omada parameter name
+      // Our canonical name â†’ Omada parameter name
       clientMac:   'clientMac',
       clientIp:    'clientIp',
       apMac:       'apMac',
@@ -160,7 +160,7 @@
     mockSuccessDelay: 800,
 
     // ==============================================================
-    // PAGE ROUTES — change if you rename the HTML files
+    // PAGE ROUTES â€” change if you rename the HTML files
     // ==============================================================
     successPage: 'success.html',
     errorPage:   'error.html',
@@ -169,3 +169,4 @@
   };
 
 })();
+

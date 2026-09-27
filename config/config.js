@@ -1,5 +1,5 @@
-/**
- * config.js — GoodVibesVendoWifi Captive Portal Frontend Configuration
+﻿/**
+ * config.js â€” GoodVibesVendoWifi Captive Portal Frontend Configuration
  *
  * Copy this file to config/config.js (keep config.example.js as a template).
  *
@@ -13,7 +13,7 @@
   window.CONFIG = {
 
     // ==============================================================
-    // BRANDING — GoodVibesVendoWifi
+    // BRANDING â€” GoodVibesVendoWifi
     // ==============================================================
     brandName: 'GoodVibesVendoWifi',
     brandTagline: 'Connect to our Guest Network',
@@ -25,7 +25,7 @@
     supportPhone: '',
 
     // ==============================================================
-    // AUTHENTICATION MODE — backend mode (voucher-based)
+    // AUTHENTICATION MODE â€” backend mode (voucher-based)
     // ==============================================================
     mode: 'backend',
 
@@ -33,9 +33,9 @@
     // BACKEND MODE
     // ==============================================================
     // Base URL of your backend server (no trailing slash)
-    // Update this when you deploy to Koyeb:
-    // e.g. https://your-app-name.koyeb.app
-    apiBaseUrl: 'https://your-app-name.koyeb.app',
+    // Update this when you deploy to Render:
+    // e.g. https://your-app-name.onrender.com
+    apiBaseUrl: 'https://your-app-name.onrender.com',
 
     // ==============================================================
     // VOUCHER VALIDATION
@@ -45,7 +45,7 @@
       minLength: 8,
       maxLength: 16,
       pattern: /^[A-Z0-9\-]+$/i,
-      patternHint: 'Letters, numbers, and dashes only, 8–16 characters',
+      patternHint: 'Letters, numbers, and dashes only, 8â€“16 characters',
     },
 
     // ==============================================================
@@ -102,3 +102,5 @@
   };
 
 })();
+
+

@@ -546,6 +546,85 @@
     if (CONFIG.termsRequired) {
       show(termsSection);
     }
+    }
+
+  // ---------------------------------------------------------------
+  function formatPrice(amount) {
+    // Amount in smallest currency unit (e.g., centavos for PHP)
+    var pesos = (amount / 100).toFixed(2);
+    return '₱' + pesos;
+  }
+
+  // ===============================================================
+  // PLAN SELECTOR (paid mode)
+  // ===============================================================
+  function initPlanSelector() {
+    var planSection = $('plan-section');
+    var planSelect = $('plan-select');
+    if (!planSection || !planSelect) return;
+
+    // Paid plans only visible in backend mode with plans configured
+    if (CONFIG.mode !== 'backend' || !CONFIG.plans || CONFIG.plans.length === 0) {
+      return;
+    }
+
+    show(planSection);
+
+    // Populate options
+    CONFIG.plans.forEach(function (plan) {
+      var opt = document.createElement('option');
+      opt.value = plan.duration; // minutes
+      opt.textContent = plan.label + ' — ' + formatPrice(plan.price);
+      planSelect.appendChild(opt);
+    });
+
+    // When plan selected, change submit button label
+    planSelect.addEventListener('change', function () {
+      var submitLabel = $('submit-label');
+      if (submitLabel) {
+        submitLabel.textContent = planSelect.value ? 'Pay & Connect' : 'Connect Now';
+      }
+    });
+  }
+
+  // ===============================================================
+  // PAYMENT TILES (backend/paid mode)
+  // ===============================================================
+  function initPaymentTiles() {
+    var tiles = document.querySelectorAll('.payment-tile');
+    if (!tiles.length) return;
+
+    tiles.forEach(function (tile) {
+
+      tile.addEventListener('click', function () {
+        // Deselect all
+        tiles.forEach(function (t) { t.classList.remove('is-selected'); });
+        // Select this one
+        tile.classList.add('is-selected');
+
+        var method = tile.getAttribute('data-payment');
+        var planSelect = $('plan-select');
+        var planSection = $('plan-section');
+
+        // If a plan is selected, redirect to the appropriate checkout flow
+        if (planSelect && planSelect.value) {
+          var plan = CONFIG.plans && CONFIG.plans.find(function (p) {
+            return String(p.duration) === planSelect.value;
+          });
+
+          if (plan) {
+            // Redirect to payment endpoint for the selected method
+            var checkoutUrl = (CONFIG.apiBaseUrl || '') + '/api/payment/initiate?' + [
+              'method=' + encodeURIComponent(method),
+              'plan=' + encodeURIComponent(planSelect.value),
+              'clientMac=' + encodeURIComponent(queryParams.clientMac || ''),
+            ].join('&');
+
+            window.location.href = checkoutUrl;
+          }
+        }
+      });
+    });
   }
 
   // ===============================================================
@@ -560,6 +639,12 @@
 
     // Set up terms visibility
     initTermsSection();
+
+    // Set up plan selector (paid mode)
+    initPlanSelector();
+
+    // Set up payment tile interactions
+    initPaymentTiles();
 
     // Input UX
     initInputEnhancements();

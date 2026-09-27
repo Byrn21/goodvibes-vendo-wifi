@@ -1,46 +1,30 @@
 /**
- * db/migrate.js — SQLite database migration runner
+ * db/migrate.js — Database migration runner
  *
  * Reads DATABASE_URL from .env and applies schema.sql.
+ * Supports both SQLite (development) and PostgreSQL (Render.com production).
  */
 
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const Database = require('better-sqlite3');
+const { getDb, closeDb } = require('./client');
 
-const DATABASE_URL = process.env.DATABASE_URL || 'sqlite:./data/portal.db';
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
 async function migrate() {
   console.log('[migrate] Starting database migration...');
-  console.log('[migrate] Database URL:', DATABASE_URL);
+  console.log('[migrate] Database URL:', process.env.DATABASE_URL || 'sqlite:./data/portal.db');
 
-  if (!DATABASE_URL.startsWith('sqlite:')) {
-    throw new Error('Only SQLite is supported. DATABASE_URL must start with sqlite:');
-  }
-
-  const dbPath = DATABASE_URL.replace('sqlite:', '');
-  const dbDir = path.dirname(dbPath);
-  const absolutePath = path.resolve(dbPath);
-
-  // Ensure directory exists
-  if (!fs.existsSync(dbDir === '' ? '.' : dbDir)) {
-    fs.mkdirSync(dbDir === '' ? '.' : dbDir, { recursive: true });
-  }
-
-  const db = new Database(absolutePath);
-
-  // Enable WAL mode for better concurrent read performance
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-
+  const db = getDb();
   const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
-  db.exec(schema);
 
-  console.log('[migrate] SQLite schema applied to:', absolutePath);
-  db.close();
+  await db.exec(schema);
+
+  console.log('[migrate] Schema applied successfully.');
   console.log('[migrate] Done.');
+
+  await closeDb();
 }
 
 migrate().catch(err => {

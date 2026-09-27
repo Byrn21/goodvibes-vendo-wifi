@@ -1,0 +1,52 @@
+services:
+  - type: web
+    name: omada-captive-portal
+    plan: free
+    region: oregon
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: postgres
+          property: connectionString
+      - key: PG_SSL_REJECT_UNAUTHORIZED
+        value: false
+      - key: DEFAULT_SESSION_DURATION
+        value: 60
+      - key: SESSION_DURATION_OPTIONS
+        value: 60,120,180,360,720,1440
+      - key: PAUSE_ENABLED
+        value: true
+      - key: SESSION_ENFORCE_INTERVAL
+        value: 60000
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 20
+      - key: LOG_LEVEL
+        value: info
+      - key: DEFAULT_REDIRECT_URL
+        value: https://www.google.com
+      # Secrets — set these in the Render dashboard
+      # BASE_URL (your Render service URL, e.g., https://omada-captive-portal.onrender.com)
+      # FRONTEND_ORIGIN (your frontend URL)
+      # OMADA_BASE_URL
+      # OMADA_API_TOKEN
+      # OMADA_SITE
+      # JWT_SECRET
+      # CORS_ORIGINS
+      # OMADA_MOCK
+      # OMADA_TLS_REJECT
+      # ALLOWED_REDIRECT_DOMAINS
+databases:
+  - name: postgres
+    plan: free
+    region: oregon

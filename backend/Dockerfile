@@ -9,8 +9,8 @@ RUN npm ci --omit=dev
 # Copy application code
 COPY . .
 
-# Expose port (Fly.io proxies 443 → 8080 by default, but we bind to PORT)
-ENV PORT=8080
+# Expose port (Render proxies external requests to $PORT; defaults to 10000)
+ENV PORT=10000
 ENV NODE_ENV=production
 
 # Run as non-root user

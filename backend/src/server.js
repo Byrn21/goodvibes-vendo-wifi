@@ -19,6 +19,7 @@ const compression = require('compression');
 const { rateLimit } = require('express-rate-limit');
 const authRoutes = require('./routes/auth');
 const sessionRoutes = require('./routes/session');
+const paymentRoutes = require('./routes/payment');
 const { startExpirationWorker } = require('./services/session');
 
 const app = express();
@@ -68,6 +69,9 @@ app.use('/api/', limiter);
 // ── Routes ───────────────────────────────────────────────────
 app.use('/api/auth',     authRoutes);
 app.use('/api/session',  sessionRoutes);
+
+// Payment routes — webhook uses raw body for signature verification
+app.use('/api/payment', paymentRoutes);
 
 // Health check (unauthenticated)
 app.get('/health', (req, res) => {
