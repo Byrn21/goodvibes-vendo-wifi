@@ -13,15 +13,12 @@ RUN npm ci --omit=dev
 # Copy application code
 COPY . .
 
-# Expose port (Render proxies external requests to $PORT; defaults to 10000)
-ENV PORT=10000
+# Expose port (Render sets $PORT dynamically at runtime)
 ENV NODE_ENV=production
 
 # Run as non-root user
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 USER nodejs
-
-EXPOSE 8080
 
 # Run migrations before starting the server
 CMD ["sh", "-c", "node src/db/migrate.js && node src/server.js"]
