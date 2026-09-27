@@ -23,4 +23,5 @@ USER nodejs
 
 EXPOSE 8080
 
-CMD ["node", "src/server.js"]
+# Run migrations before starting the server
+CMD ["sh", "-c", "node src/db/migrate.js && node src/server.js"]

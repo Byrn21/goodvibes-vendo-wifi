@@ -26,14 +26,13 @@ async function seed() {
 
   const db = getDb();
 
-  for (const v of vouchers) {
-    // INSERT OR IGNORE (SQLite) / ON CONFLICT DO NOTHING (PostgreSQL)
-    // The db client's run() handles placeholder conversion;
-    // we use INSERT OR IGNORE which works in SQLite. For PostgreSQL,
-    // we catch the unique violation error instead.
+     for (const v of vouchers) {
+    // Use ON CONFLICT for PostgreSQL, INSERT OR IGNORE works in SQLite
+    // The db client's run() handles placeholder conversion (? -> $N for PG)
+    // ON CONFLICT works in PostgreSQL; SQLite 3.24+ supports it too
     try {
       await db.run(
-        'INSERT OR IGNORE INTO vouchers (code, duration_minutes, state) VALUES (?, ?, ?)',
+        'INSERT INTO vouchers (code, duration_minutes, state) VALUES (?, ?, ?) ON CONFLICT (code) DO NOTHING',
         [v.code, v.duration, v.state]
       );
     } catch (err) {
