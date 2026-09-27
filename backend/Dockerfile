@@ -7,11 +7,19 @@ WORKDIR /app
 # better-sqlite3 needs native build tools but is only used for local dev
 RUN apk add --no-cache python3 make g++
 
-COPY package*.json ./
+COPY backend/package*.json ./
 RUN npm ci --omit=dev
 
-# Copy application code
-COPY . .
+# Copy backend application code
+COPY backend/ .
+
+# Copy static portal files (from repo root)
+COPY index.html      /app/public/index.html
+COPY success.html    /app/public/success.html
+COPY status.html     /app/public/status.html
+COPY error.html      /app/public/error.html
+COPY assets/         /app/public/assets/
+COPY config/config.js /app/public/config/config.js
 
 # Expose port (Render sets $PORT dynamically at runtime)
 ENV NODE_ENV=production

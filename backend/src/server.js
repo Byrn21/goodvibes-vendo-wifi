@@ -17,6 +17,7 @@ const cors = require('cors');
 const compression = require('compression');
 
 const { rateLimit } = require('express-rate-limit');
+const path = require('path');
 const authRoutes = require('./routes/auth');
 const sessionRoutes = require('./routes/session');
 const paymentRoutes = require('./routes/payment');
@@ -77,6 +78,34 @@ app.use('/api/payment', paymentRoutes);
 app.get('/health', (req, res) => {
   res.json({ ok: true, timestamp: new Date().toISOString(), env: NODE_ENV });
 });
+
+// ── Static file serving for captive portal pages ──────────────────
+// Docker: static files copied to /app/public/ by Dockerfile
+// Local dev: HTML files live in the project root (parent of backend/)
+const fs = require('fs');
+
+const candidates = [
+  path.join(__dirname, '..', 'public'),              // Docker: /app/public/
+  path.join(__dirname, '..', '..'),                 // Local dev: project-root/
+];
+
+let PORTAL_HTML_DIR = null;
+for (const candidate of candidates) {
+  if (fs.existsSync(path.join(candidate, 'index.html'))) {
+    PORTAL_HTML_DIR = candidate;
+    break;
+  }
+}
+
+if (PORTAL_HTML_DIR) {
+  app.use(express.static(PORTAL_HTML_DIR));
+  app.get('/', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'index.html')));
+  app.get('/success', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'success.html')));
+  app.get('/status', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'status.html')));
+  app.get('/error', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'error.html')));
+} else {
+  console.warn('[WARN] Portal HTML directory not found — static file serving disabled.');
+}
 
 // 404 handler
 app.use((req, res) => {
