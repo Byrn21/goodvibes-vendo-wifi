@@ -1138,14 +1138,19 @@ body {
   overflow: visible;
 }
 
-.pricing-container {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-  border: 1px solid var(--border-light);
-  padding: 20px;
-  overflow: visible;
-}
+  .pricing-container {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    border: 1px solid var(--border-light);
+    padding: 20px;
+    overflow: visible;
+  }
+  .pricing-table-wrap {
+    overflow-x: auto;
+    margin: -8px -8px -8px -8px;
+    padding: 0 8px;
+  }
 
 .pricing-title {
   font-size: 1.125rem;
@@ -1242,7 +1247,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: -8px;
+  gap: 6px;
 }
 .pricing-table td.text-center .btn {
   flex-shrink: 1;
@@ -1391,6 +1396,13 @@ body {
     grid-template-columns: 1fr 1fr;
   }
   .pricing-title { font-size: 1.25rem; }
+  
+  /* Remove scroll on tablet+ since grid is 2-col */
+  .pricing-table-wrap {
+    overflow-x: visible;
+    margin: 0;
+    padding: 0;
+  }
 
   .countdown-number { font-size: 3rem; }
   .countdown-sep     { font-size: 3rem; }
@@ -1424,6 +1436,167 @@ body {
 }
 
 /* ---- Reduced motion ---- */
+
+
+/* ---- Modal / Popup ---- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.modal-dialog {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  max-width: 420px;
+  width: 100%;
+  border: 1px solid var(--border-light);
+  animation: modalSlideIn 0.3s ease;
+}
+
+/* Cash modal dialog: natural size, scrollable body */
+#cash-modal .modal-dialog {
+  max-width: 520px;
+  max-height: 85vh;
+  color: var(--text);
+}
+
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid var(--border-light);
+  background: var(--surface-2);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.75rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-3);
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+
+.modal-close:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+.modal-body {
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.modal-message {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.modal-message strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.modal-instruction {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-3);
+  line-height: 1.4;
+}
+
+.modal-footer {
+  padding: 12px 20px 18px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---- Cash Modal: Store Photo ---- */
+.cash-modal__img-wrap {
+  width: 100%;
+  margin: 0;
+  text-align: center;
+}
+
+.cash-modal__img {
+  display: block;
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---- Cash Modal: Instructions ---- */
+.cash-modal__instructions {
+  margin-top: 16px;
+  background: var(--surface);
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+}
+
+.cash-modal__lang-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 16px 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cash-modal__lang-title:first-child {
+  margin-top: 0;
+}
+
+.cash-modal__list {
+  margin: 0 0 12px 20px;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.cash-modal__list li {
+  margin-bottom: 8px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -1431,4 +1604,5 @@ body {
   }
   .carousel__track { transition: none; }
   .marquee-content { animation: none; }
+  .modal-dialog { animation: none; }
 }

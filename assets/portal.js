@@ -694,6 +694,13 @@
         tile.classList.add('is-selected');
 
         var method = tile.getAttribute('data-payment');
+
+        // Cash: show instructions modal instead of redirecting
+        if (method === 'cash') {
+          showCashModal();
+          return;
+        }
+
         var typeSelect = $('voucher-type-select');
         var planSelect = $('plan-select');
 
@@ -718,7 +725,122 @@
     // ===============================================================
   // PRICING TABLE SELECT HANDLER
   // ===============================================================
-  function initPricingTable() {
+
+  // ===============================================================
+  // PLAN SELECTION MODAL POPUP
+  // ===============================================================
+  function showPlanModal(tier, durText) {
+    var modal = $('plan-modal');
+    var planEl = $('plan-modal-plan');
+    var closeBtn = $('plan-modal-close');
+    var okBtn = $('plan-modal-ok');
+    
+    if (!modal || !planEl) return;
+    
+    // Set the message content
+    var tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
+    planEl.textContent = tierName + ' - ' + durText + ' plan';
+    
+    // Show modal
+    show(modal);
+    modal.focus();
+    
+    // Hide the status banner when modal is shown
+    setBanner('');
+    
+    // Auto-focus OK button for keyboard users
+    if (okBtn) setTimeout(function() { okBtn.focus(); }, 100);
+    
+    // Close handler
+    function closeModal() {
+      hide(modal);
+      
+      // Scroll payment section into view
+      var paymentSection = document.querySelector('.payment-method-section');
+      if (paymentSection) {
+        paymentSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+    
+    // Remove existing listeners to avoid duplicates
+    if (closeBtn) {
+      closeBtn.onclick = closeModal;
+    }
+    if (okBtn) {
+      okBtn.onclick = closeModal;
+    }
+    
+    // Close on overlay click
+    modal.onclick = function(e) {
+      if (e.target === modal) closeModal();
+    };
+    
+    // Close on Escape key
+    function onEsc(e) {
+      if (e.key === 'Escape') {
+        closeModal();
+        document.removeEventListener('keydown', onEsc);
+      }
+    }
+    document.addEventListener('keydown', onEsc);
+  }
+
+
+   // ==============================================================================
+   // CASH PAYMENT INSTRUCTIONS MODAL
+   // ==============================================================================
+   function showCashModal() {
+     var modal = $('cash-modal');
+     var closeBtn = $('cash-modal-close');
+     var okBtn = $('cash-modal-close-btn');
+
+     if (!modal) return;
+
+     // Show modal
+     show(modal);
+     modal.focus();
+
+     // Hide the status banner when modal is shown
+     setBanner('');
+
+     // Auto-focus Close button for keyboard users
+     if (okBtn) setTimeout(function() { okBtn.focus(); }, 100);
+
+     // Close handler
+     function closeModal() {
+       hide(modal);
+
+       // Scroll payment section into view
+       var paymentSection = document.querySelector('.payment-method-section');
+       if (paymentSection) {
+         paymentSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+       }
+     }
+
+     // Remove existing listeners to avoid duplicates
+     if (closeBtn) {
+       closeBtn.onclick = closeModal;
+     }
+     if (okBtn) {
+       okBtn.onclick = closeModal;
+     }
+
+     // Close on overlay click
+     modal.onclick = function(e) {
+       if (e.target === modal) closeModal();
+     };
+
+     // Close on Escape key
+     function onEsc(e) {
+       if (e.key === 'Escape') {
+         closeModal();
+         document.removeEventListener('keydown', onEsc);
+       }
+     }
+     document.addEventListener('keydown', onEsc);
+   }
+
+   function initPricingTable() {
     var selectButtons = document.querySelectorAll('.btn--select');
     if (!selectButtons.length) return;
 
@@ -790,7 +912,7 @@
         });
         row.classList.add('is-selected');
 
-        // Show status banner
+        // Show plan selection modal
         var durMin = duration;
         var durText = '';
         if (duration >= 1440) {
@@ -801,7 +923,7 @@
           durText = duration + ' minute' + (duration >= 2 ? 's' : '');
         }
 
-        setBanner('Selected: ' + tier.charAt(0).toUpperCase() + tier.slice(1) + ' - ' + durText + ' plan. Choose a payment method.', 'info');
+        showPlanModal(tier, durText);
       });
     });
 
@@ -851,6 +973,8 @@
           submitLabel.textContent = 'Connect Now';
         }
 
+        var modalEl = document.getElementById("plan-modal");
+        if (modalEl) hide(modalEl);
         setBanner('');
         setFormError('');
       });

@@ -264,7 +264,7 @@
                 <span class="tier-badge tier-badge--standard">Standard</span>
                 <span class="tier-subtitle">Continuous - no pause</span>
               </div>
-              <table class="pricing-table pricing-table--standard">
+              <div class="pricing-table-wrap"><table class="pricing-table pricing-table--standard">
                 <colgroup>
                   <col>
                   <col>
@@ -310,6 +310,7 @@
                   </tr>
                 </tbody>
               </table>
+          </div>
             </div>
 
             <!-- Premium Tier -->
@@ -318,7 +319,7 @@
                 <span class="tier-badge tier-badge--premium">Premium</span>
                 <span class="tier-subtitle">Pausable - 1 week validity to pause</span>
               </div>
-              <table class="pricing-table pricing-table--premium">
+              <div class="pricing-table-wrap"><table class="pricing-table pricing-table--premium">
                 <colgroup>
                   <col>
                   <col>
@@ -349,11 +350,11 @@
                   </tr>
                 </tbody>
               </table>
+          </div>
             </div>
-
           </div>
         </div>
-            </section>
+      </section>
 
       <!-- ================================================================
             PAYMENT METHOD TILES
@@ -425,20 +426,20 @@
             <button
               type="button"
               class="payment-tile"
-              data-payment="coming soon"
-              aria-label="Coming soon"
+              data-payment="cash"
+              aria-label="Pay with Cash"
             >
               <div class="payment-tile__icon-wrap" aria-hidden="false">
                 <img
                   class="payment-tile__logo"
-                  src="assets/images/coming soon.png"
-                  alt="coming soon"
+                  src="assets/images/cash.png"
+                  alt="Cash"
                   width="40"
                   height="40"
                   loading="lazy"
                 />
               </div>
-              <span class="payment-tile__name">Coming soon</span>
+              <span class="payment-tile__name">Cash</span>
             </button>
 
           </div><!-- /.payment-tiles -->
@@ -454,7 +455,68 @@
       </footer>
 
     </main>
-  </div><!-- /.page-wrapper -->
+  
+  <!-- Plan Selection Modal Popup -->
+  <div id="plan-modal" class="modal-overlay hidden" tabindex="-1" role="dialog" aria-labelledby="plan-modal-title" aria-modal="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="plan-modal-title">Plan Selected</h3>
+        <button type="button" class="modal-close" aria-label="Close" id="plan-modal-close">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-message">You selected: <strong id="plan-modal-plan"></strong></p>
+        <p class="modal-instruction">Now choose a payment method below.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn--primary" id="plan-modal-ok">OK, Got It</button>
+      </div>
+    </div>
+  </div>
+<!-- Cash Payment Instructions Modal -->
+  <div id="cash-modal" class="modal-overlay hidden" tabindex="-1" role="dialog" aria-labelledby="cash-modal-title" aria-modal="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="cash-modal-title">Cash Payment Instructions</h3>
+        <button type="button" class="modal-close" aria-label="Close" id="cash-modal-close">×</button>
+      </div>
+      <div class="modal-body">
+        <!-- Store photo image container -->
+        <div class="cash-modal__img-wrap">
+          <img
+            id="cash-modal-image"
+            class="cash-modal__img"
+            src="assets/images/store-photo.jpg"
+            alt="Physical store location � Blk 34 Lot 1 Eucalyptus Street, Phase 5, Mabuhay City Subdivision"
+            width="400"
+            height="400"
+          />
+        </div>
+        <!-- Instructions -->
+        <div class="cash-modal__instructions">
+          <h4 class="cash-modal__lang-title">English</h4>
+          <ol class="cash-modal__list cash-modal__list--en">
+            <li>Head to the physical store located at .</li>
+            <li>Ensure you arrive while the store is open. Operating hours are daily from 8:00 AM to 8:00 PM.</li>
+            <li>Inform the staff which internet time duration you want to purchase and pay the corresponding amount in cash.</li>
+            <li>The store attendant will hand you a unique Wi-Fi voucher code. Keep this code secure.</li>
+            <li>Connect your smartphone or laptop to the Wi-Fi network [GoodVibesWiFiVendo]. Once the login portal appears on your screen, enter your voucher code to activate your session and start browsing.</li>
+          </ol>
+          <h4 class="cash-modal__lang-title">Tagalog</h4>
+          <ol class="cash-modal__list cash-modal__list--tl">
+            <li>Magtungo sa aming tindahan na matatagpuan sa </li>
+            <li>Siguraduhing pumunta sa oras ng bukas ang aming tindahan. Bukas ang aming tindahan araw-araw mula 8:00 AM hanggang 8:00 PM.</li>
+            <li>Sabihin sa bantay kung gaano katagal na internet ang gusto mong bilhin at magbayad gamit ang cash.</li>
+            <li>Ibibigay sa iyo ng staff ang iyong Wi-Fi voucher code. Itago itong mabuti.</li>
+            <li>I-connect ang iyong cellphone o laptop sa aming Wi-Fi network [GoodVibesWiFiVendo]. Kapag lumabas na ang login portal sa iyong screen, ilagay ang iyong voucher code para ma-activate ito at makapag-internet na.</li>
+          </ol>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn--primary" id="cash-modal-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+</div><!-- /.page-wrapper -->
 
   <script src="assets/carousel.js"></script>
   <script src="config/config.js"></script>
@@ -470,3 +532,4 @@
   </script>
 </body>
 </html>
+
