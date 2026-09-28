@@ -1218,7 +1218,7 @@ body {
 .pricing-table colgroup col {
   /* Duration: ~30%, Price: ~25%, Action: ~45% */
 }
-.pricing-table col:nth-child(1) { width: 30%; }
+.pricing-table col:nth-child(1) { width: 35%; }
 .pricing-table col:nth-child(2) { width: 25%; }
 .pricing-table col:nth-child(3) { width: 45%; }
 
@@ -1464,10 +1464,10 @@ body {
   animation: modalSlideIn 0.3s ease;
 }
 
-/* Cash modal dialog: natural size, scrollable body */
+/* Cash timer modal: compact vertical layout */
 #cash-modal .modal-dialog {
-  max-width: 520px;
-  max-height: 85vh;
+  max-width: 420px;
+  max-height: 80vh;
   color: var(--text);
 }
 
@@ -1543,58 +1543,71 @@ body {
   padding: 12px 20px 18px;
   border-top: 1px solid var(--border-light);
   display: flex;
+  gap: 12px;
   justify-content: flex-end;
 }
 
-/* ---- Cash Modal: Store Photo ---- */
-.cash-modal__img-wrap {
-  width: 100%;
-  margin: 0;
+/* ---- Cash Timer Modal: Content ---- */
+.cash-timer__content {
   text-align: center;
+  padding: 16px 0;
 }
 
-.cash-modal__img {
-  display: block;
-  width: 100%;
-  max-width: 400px;
-  height: auto;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-sm);
+.cash-timer__subtitle {
+  font-size: 0.95rem;
+  color: var(--text-2);
+  margin: 0 0 16px;
+  line-height: 1.5;
 }
 
-/* ---- Cash Modal: Instructions ---- */
-.cash-modal__instructions {
-  margin-top: 16px;
-  background: var(--surface);
-  padding: 12px 16px;
-  border-radius: var(--radius-sm);
+.cash-timer__subtitle--tl {
+  display: none;
 }
 
-.cash-modal__lang-title {
-  font-size: 0.8125rem;
+/* Countdown timer */
+.cash-timer__countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 24px auto;
+  padding: 20px 32px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  border: 2px dashed var(--primary);
+}
+
+.cash-timer__number {
+  font-family: "Courier New", "Courier Prime", monospace;
+  font-size: 2.5rem;
   font-weight: 700;
   color: var(--primary);
-  margin: 16px 0 8px;
+  line-height: 1;
+}
+
+.cash-timer__label {
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
 }
 
-.cash-modal__lang-title:first-child {
-  margin-top: 0;
+/* Store info */
+.cash-timer__store-info {
+  text-align: center;
+  margin-top: 20px;
 }
 
-.cash-modal__list {
-  margin: 0 0 12px 20px;
-  padding: 0;
-  font-size: 0.875rem;
-  line-height: 1.6;
-  color: var(--text);
+.cash-timer__store-hours {
+  font-size: 0.8125rem;
+  color: var(--text-3);
+  margin: 4px 0;
+  line-height: 1.4;
 }
 
-.cash-modal__list li {
-  margin-bottom: 8px;
+.cash-timer__store-hours--tl {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

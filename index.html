@@ -472,47 +472,35 @@
       </div>
     </div>
   </div>
-<!-- Cash Payment Instructions Modal -->
+<!-- Cash Payment Timer Modal -->
   <div id="cash-modal" class="modal-overlay hidden" tabindex="-1" role="dialog" aria-labelledby="cash-modal-title" aria-modal="true">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3 id="cash-modal-title">Cash Payment Instructions</h3>
+        <h3 id="cash-modal-title">Cash Payment</h3>
         <button type="button" class="modal-close" aria-label="Close" id="cash-modal-close">×</button>
       </div>
       <div class="modal-body">
-        <!-- Store photo image container -->
-        <div class="cash-modal__img-wrap">
-          <img
-            id="cash-modal-image"
-            class="cash-modal__img"
-            src="assets/images/store-photo.jpg"
-            alt="Physical store location � Blk 34 Lot 1 Eucalyptus Street, Phase 5, Mabuhay City Subdivision"
-            width="400"
-            height="400"
-          />
-        </div>
-        <!-- Instructions -->
-        <div class="cash-modal__instructions">
-          <h4 class="cash-modal__lang-title">English</h4>
-          <ol class="cash-modal__list cash-modal__list--en">
-            <li>Head to the physical store located at .</li>
-            <li>Ensure you arrive while the store is open. Operating hours are daily from 8:00 AM to 8:00 PM.</li>
-            <li>Inform the staff which internet time duration you want to purchase and pay the corresponding amount in cash.</li>
-            <li>The store attendant will hand you a unique Wi-Fi voucher code. Keep this code secure.</li>
-            <li>Connect your smartphone or laptop to the Wi-Fi network [GoodVibesWiFiVendo]. Once the login portal appears on your screen, enter your voucher code to activate your session and start browsing.</li>
-          </ol>
-          <h4 class="cash-modal__lang-title">Tagalog</h4>
-          <ol class="cash-modal__list cash-modal__list--tl">
-            <li>Magtungo sa aming tindahan na matatagpuan sa </li>
-            <li>Siguraduhing pumunta sa oras ng bukas ang aming tindahan. Bukas ang aming tindahan araw-araw mula 8:00 AM hanggang 8:00 PM.</li>
-            <li>Sabihin sa bantay kung gaano katagal na internet ang gusto mong bilhin at magbayad gamit ang cash.</li>
-            <li>Ibibigay sa iyo ng staff ang iyong Wi-Fi voucher code. Itago itong mabuti.</li>
-            <li>I-connect ang iyong cellphone o laptop sa aming Wi-Fi network [GoodVibesWiFiVendo]. Kapag lumabas na ang login portal sa iyong screen, ilagay ang iyong voucher code para ma-activate ito at makapag-internet na.</li>
-          </ol>
+        <div class="cash-timer__content">
+          <!-- Subtitle - English -->
+          <p class="cash-timer__subtitle">Please go to our store for cash payment and get your voucher</p>
+          <!-- Subtitle - Tagalog -->
+          <p class="cash-timer__subtitle--tl">Pumunta sa aming tindahan para sa cash payment at kunin ang iyong voucher</p>
+          <!-- Countdown timer -->
+          <div class="cash-timer__countdown" id="cash-timer-countdown">
+            <span id="cash-timer-seconds" class="cash-timer__number">2:50</span>
+            <span class="cash-timer__label">remaining</span>
+          </div>
+          <!-- Store hours -->
+          <div class="cash-timer__store-info">
+            <p class="cash-timer__store-hours">Store Hours: 8:00 AM – 8:00 PM daily</p>
+            <p class="cash-timer__store-hours">Store Location: </p>
+            <p class="cash-timer__store-hours--tl">Oras ng Operasyon: 8:00 AM – 8:00 PM araw-araw</p>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn--primary" id="cash-modal-close-btn">Close</button>
+        <button type="button" class="btn btn--outline btn--full" id="cash-timer-cancel">Cancel</button>
+        <button type="button" class="btn btn--primary btn--full" id="cash-timer-have-voucher">I already have a voucher</button>
       </div>
     </div>
   </div>

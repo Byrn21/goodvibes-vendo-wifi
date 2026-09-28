@@ -71,6 +71,16 @@
     // ==============================================================
     statusPollingInterval: 30000,
         showPauseResume: true,
+
+    // =============================================================
+    // CASH PAYMENT TIMER
+    // =============================================================
+    cashPayment: {
+      // Timer duration in seconds (2 minutes 50 seconds)
+      timerSeconds: 170,
+      // Page to redirect to when timer expires or voucher claimed
+      redirectUrl: 'index.html',
+    },
     // ==============================================================
     // PRICING TABLE (pricing plans displayed on portal)
     // =============================================================

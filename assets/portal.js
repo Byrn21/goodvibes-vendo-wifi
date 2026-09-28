@@ -695,9 +695,9 @@
 
         var method = tile.getAttribute('data-payment');
 
-        // Cash: show instructions modal instead of redirecting
+        // Cash: show timer modal with countdown, then redirect to voucher input
         if (method === 'cash') {
-          showCashModal();
+          showCashTimerModal();
           return;
         }
 
@@ -787,28 +787,70 @@
 
 
    // ==============================================================================
-   // CASH PAYMENT INSTRUCTIONS MODAL
+   // CASH PAYMENT TIMER MODAL
    // ==============================================================================
-   function showCashModal() {
+   function showCashTimerModal() {
      var modal = $('cash-modal');
      var closeBtn = $('cash-modal-close');
-     var okBtn = $('cash-modal-close-btn');
+     var cancelBtn = $('cash-timer-cancel');
+     var haveVoucherBtn = $('cash-timer-have-voucher');
+     var timerDisplay = $('cash-timer-seconds');
 
      if (!modal) return;
 
-     // Show modal
-     show(modal);
-     modal.focus();
+     // Timer: 2 minutes 50 seconds = 170 seconds (configurable via CONFIG.cashPayment.timerSeconds)
+     var TOTAL_SECONDS = (window.CONFIG && window.CONFIG.cashPayment && window.CONFIG.cashPayment.timerSeconds) || 170;
+     var remaining = TOTAL_SECONDS;
+     var countdownInterval = null;
 
-     // Hide the status banner when modal is shown
-     setBanner('');
+     // Format seconds as M:SS
+     function formatTime(seconds) {
+       var m = Math.floor(seconds / 60);
+       var s = seconds % 60;
+       return m + ':' + (s < 10 ? '0' : '') + s;
+     }
 
-     // Auto-focus Close button for keyboard users
-     if (okBtn) setTimeout(function() { okBtn.focus(); }, 100);
+     // Update the timer display
+     function updateTimerDisplay() {
+       if (timerDisplay) {
+         timerDisplay.textContent = formatTime(remaining);
+       }
+     }
 
-     // Close handler
+     // Start the countdown
+     function startCountdown() {
+       remaining = TOTAL_SECONDS;
+       updateTimerDisplay();
+
+       countdownInterval = setInterval(function () {
+         remaining--;
+         updateTimerDisplay();
+
+         if (remaining <= 0) {
+           clearInterval(countdownInterval);
+           // Timer expired - redirect to voucher input page
+           var redirectUrl = (window.CONFIG && window.CONFIG.cashPayment && window.CONFIG.cashPayment.redirectUrl) || 'index.html';
+           window.location.href = redirectUrl;
+         }
+       }, 1000);
+     }
+
+     // Stop the countdown
+     function stopCountdown() {
+       if (countdownInterval) {
+         clearInterval(countdownInterval);
+         countdownInterval = null;
+       }
+     }
+
+     // Close handler - also deselects the Cash tile
      function closeModal() {
+       stopCountdown();
        hide(modal);
+
+       // Deselect the Cash payment tile
+       var tiles = document.querySelectorAll('.payment-tile');
+       tiles.forEach(function (t) { t.classList.remove('is-selected'); });
 
        // Scroll payment section into view
        var paymentSection = document.querySelector('.payment-method-section');
@@ -817,16 +859,39 @@
        }
      }
 
+     // "I already have a voucher" handler
+     function redirectToVoucher() {
+       stopCountdown();
+       var redirectUrl = (window.CONFIG && window.CONFIG.cashPayment && window.CONFIG.cashPayment.redirectUrl) || 'index.html';
+       window.location.href = redirectUrl;
+     }
+
+     // Show modal
+     show(modal);
+     modal.focus();
+
+     // Hide the status banner when modal is shown
+     setBanner('');
+
+     // Start the countdown
+     startCountdown();
+
+     // Auto-focus Cancel button for keyboard users
+     if (cancelBtn) setTimeout(function () { cancelBtn.focus(); }, 100);
+
      // Remove existing listeners to avoid duplicates
      if (closeBtn) {
        closeBtn.onclick = closeModal;
      }
-     if (okBtn) {
-       okBtn.onclick = closeModal;
+     if (cancelBtn) {
+       cancelBtn.onclick = closeModal;
+     }
+     if (haveVoucherBtn) {
+       haveVoucherBtn.onclick = redirectToVoucher;
      }
 
      // Close on overlay click
-     modal.onclick = function(e) {
+     modal.onclick = function (e) {
        if (e.target === modal) closeModal();
      };
 
