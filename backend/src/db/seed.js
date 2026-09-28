@@ -16,24 +16,25 @@ async function seed() {
 
   console.log('[seed] Creating development voucher codes...');
 
-  const vouchers = [
-    { code: 'WIFI-TEST-0001', duration: 60,  state: 'active' },
-    { code: 'WIFI-TEST-0002', duration: 120, state: 'active' },
-    { code: 'WIFI-TEST-0003', duration: 180, state: 'active' },
-    { code: 'EXPIRED-VOUCHER', duration: 60,  state: 'expired' },
-    { code: 'USED-VOUCHER',    duration: 60,  state: 'used' },
+    const vouchers = [
+    { code: 'WIFI-TEST-0001', type: 'standard', duration: 60,  state: 'active', price: 333 },
+    { code: 'WIFI-TEST-0002', type: 'standard', duration: 120, state: 'active', price: 667 },
+    { code: 'WIFI-TEST-0003', type: 'standard', duration: 180, state: 'active', price: 1000 },
+    { code: 'EXPIRED-VOUCHER', type: 'standard', duration: 60,  state: 'expired', price: 333 },
+    { code: 'USED-VOUCHER',    type: 'standard', duration: 60,  state: 'used', price: 333 },
+    // Premium vouchers — consumable with pause/resume (7-day pause validity)
+    { code: 'PREMIUM-TEST-001', type: 'premium', duration: 300,  state: 'active', price: 667 },
+    { code: 'PREMIUM-TEST-002', type: 'premium', duration: 480,  state: 'active', price: 1167 },
+    { code: 'PREMIUM-TEST-003', type: 'premium', duration: 1440, state: 'active', price: 3000 },
   ];
 
   const db = getDb();
 
-     for (const v of vouchers) {
-    // Use ON CONFLICT for PostgreSQL, INSERT OR IGNORE works in SQLite
-    // The db client's run() handles placeholder conversion (? -> $N for PG)
-    // ON CONFLICT works in PostgreSQL; SQLite 3.24+ supports it too
+  for (const v of vouchers) {
     try {
       await db.run(
-        'INSERT INTO vouchers (code, duration_minutes, state) VALUES (?, ?, ?) ON CONFLICT (code) DO NOTHING',
-        [v.code, v.duration, v.state]
+        'INSERT INTO vouchers (code, type, duration_minutes, price, state) VALUES (?, ?, ?, ?, ?) ON CONFLICT (code) DO NOTHING',
+        [v.code, v.type, v.duration, v.price, v.state]
       );
     } catch (err) {
       // Unique violation — voucher already exists, skip
@@ -45,7 +46,7 @@ async function seed() {
     }
   }
 
-  console.log('[seed] Inserted', vouchers.length, 'vouchers.');
+  console.log('[seed] Inserted', vouchers.length, 'vouchers (including premium).');
   await closeDb();
 }
 

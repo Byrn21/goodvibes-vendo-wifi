@@ -21,6 +21,7 @@ const path = require('path');
 const authRoutes = require('./routes/auth');
 const sessionRoutes = require('./routes/session');
 const paymentRoutes = require('./routes/payment');
+const adminRoutes = require('./routes/admin');
 const { startExpirationWorker } = require('./services/session');
 
 const app = express();
@@ -83,6 +84,7 @@ app.use('/api/', limiter);
 // ── Routes ───────────────────────────────────────────────────
 app.use('/api/auth',     authRoutes);
 app.use('/api/session',  sessionRoutes);
+app.use('/api/admin',    adminRoutes);
 
 // Payment routes — webhook uses raw body for signature verification
 app.use('/api/payment', paymentRoutes);
@@ -114,7 +116,8 @@ if (PORTAL_HTML_DIR) {
   app.use(express.static(PORTAL_HTML_DIR));
   app.get('/', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'index.html')));
   app.get('/success', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'success.html')));
-  app.get('/status', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'status.html')));
+      app.get('/status', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'status.html')));
+  app.get('/admin', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'admin.html')));
   app.get('/error', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'error.html')));
 } else {
   console.warn('[WARN] Portal HTML directory not found — static file serving disabled.');

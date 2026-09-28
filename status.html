@@ -369,12 +369,19 @@
         if (state === 'active') {
           showSection('active');
           localSeconds = Math.floor(data.remainingSeconds || 0);
-          totalSeconds = localSeconds; // treat first value as 100% for ring
+          totalSeconds = data.totalSeconds || localSeconds; // use server-provided total for ring
           updateCountdownDisplay(localSeconds);
           startCountdownTick();
-          if (CONFIG.showPauseResume && data.canPause !== false) {
-            if (els.controls) els.controls.classList.remove('hidden');
-            if (els.btnPause) els.btnPause.disabled = false;
+
+          // Pause only for Premium sessions
+          var isPremium = data.voucherType === 'premium';
+          if (els.controls) {
+            if (CONFIG.showPauseResume && data.canPause !== false && isPremium) {
+              els.controls.classList.remove('hidden');
+              if (els.btnPause) els.btnPause.disabled = false;
+            } else {
+              els.controls.classList.add('hidden');
+            }
           }
         } else if (state === 'paused') {
           showSection('paused');

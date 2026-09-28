@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel — WiFi Portal</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    body { background: #f0f2f5; }
+    .admin-container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .admin-card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .admin-card h2 { margin: 0 0 16px 0; color: #1a1a1a; font-size: 20px; }
+    .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .stat-card { background: #f8f9fa; border-radius: 8px; padding: 16px; text-align: center; }
+    .stat-card .stat-value { font-size: 28px; font-weight: 700; color: #2d6a4f; }
+    .stat-card .stat-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+    .form-row > * { flex: 1; min-width: 150px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #e0e0e0; font-size: 14px; }
+    th { background: #f8f9fa; font-weight: 600; color: #333; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .badge-standard { background: #e3f2fd; color: #1565c0; }
+    .badge-premium { background: #fff3e0; color: #e65100; }
+    .badge-active { background: #e8f5e9; color: #2e7d32; }
+    .badge-expired { background: #ffebee; color: #c62828; }
+    .badge-used { background: #fafafa; color: #616161; }
+    .hidden { display: none; }
+    .muted { color: #888; font-style: italic; }
+    .error-msg { color: #c62828; font-size: 13px; margin-top: 4px; }
+    .success-msg { color: #2e7d32; font-size: 13px; margin-top: 4px; }
+    .tab-bar { display: flex; gap: 0; margin-bottom: 0; }
+    .tab-bar button { flex: 1; padding: 12px 16px; border: none; background: #f0f2f5; cursor: pointer; font-weight: 500; }
+    .tab-bar button.active { background: #fff; border-bottom: 3px solid #2d6a4f; color: #2d6a4f; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="admin-container">
+    <div class="admin-card">
+      <h2>WiFi Portal — Admin Panel</h2>
+      <div class="admin-grid" id="stats-grid"></div>
+      <p class="muted" id="api-status">Enter your API key to begin.</p>
+      <button id="set-key-btn" class="btn btn--outline">Set API Key</button>
+    </div>
+    <div class="admin-card">
+      <div class="tab-bar">
+        <button class="tab-btn active" data-tab="vouchers">Vouchers</button>
+        <button class="tab-btn" data-tab="sessions">Sessions</button>
+        <button class="tab-btn" data-tab="create">Create Voucher</button>
+      </div>
+      <div id="tab-vouchers" class="tab-content active"></div>
+      <div id="tab-sessions" class="tab-content"></div>
+      <div id="tab-create" class="tab-content"></div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      'use strict';
+
+      var API_BASE = (window.CONFIG && window.CONFIG.apiBaseUrl) || '';
+      var API_KEY = '';
+
+      var els = {
+        statsGrid:  document.getElementById('stats-grid'),
+        apiStatus:  document.getElementById('api-status'),
+        setKeyBtn:  document.getElementById('set-key-btn'),
+        tabVouchers: document.getElementById('tab-vouchers'),
+        tabSessions: document.getElementById('tab-sessions'),
+        tabCreate:   document.getElementById('tab-create'),
+        tabs: document.querySelectorAll('.tab-btn'),
+      };
+
+      function api(path, opts) {
+        opts = opts || {};
+        opts.headers = opts.headers || {};
+        if (API_KEY) opts.headers['X-API-Key'] = API_KEY;
+        return fetch(API_BASE + path, opts)
+          .then(function (r) {
+            return r.json().then(function (d) { return { ok: r.ok, data: d }; });
+          });
+      }
+
+      function setApiKey() {
+        var key = prompt('Enter your Admin API Key:');
+        if (key) {
+          API_KEY = key;
+          els.apiStatus.textContent = 'API key set. Data will be loaded below.';
+          els.apiStatus.className = '';
+          loadStats();
+          loadVouchers();
+        }
+      }
+
+      if (els.setKeyBtn) {
+        els.setKeyBtn.addEventListener('click', setApiKey);
+      }
+
+      function loadStats() {
+        api('/api/admin/stats')
+          .then(function (res) {
+            if (!res.ok) throw new Error(res.data.error || 'API error');
+            var s = res.data.stats;
+            els.statsGrid.innerHTML = [
+              stat('Total Vouchers', s.totalVouchers),
+              stat('Active Vouchers', s.activeVouchers),
+              stat('Used Vouchers', s.usedVouchers),
+              stat('Total Sessions', s.totalSessions),
+              stat('Active Sessions', s.activeSessions),
+              stat('Paused Sessions', s.pausedSessions),
+              stat('Premium Sessions', s.premiumSessions),
+              stat('Total Revenue', s.totalRevenue),
+            ].join('');
+          })
+          .catch(function (err) {
+            els.apiStatus.textContent = 'Failed to load stats: ' + err.message;
+            els.apiStatus.className = 'error-msg';
+          });
+      }
+
+      function stat(label, value) {
+        return '<div class="stat-card"><div class="stat-value">' + (value || 0) + '</div><div class="stat-label">' + label + '</div></div>';
+      }
+
+      function loadVouchers() {
+        els.tabVouchers.innerHTML = '<p class="muted">Loading…</p>';
+        api('/api/admin/vouchers')
+          .then(function (res) {
+            if (!res.ok) throw new Error(res.data.error || 'Failed');
+            var v = res.data.vouchers || [];
+            if (!v.length) {
+              els.tabVouchers.innerHTML = '<p class="muted">No vouchers found.</p>';
+              return;
+            }
+            els.tabVouchers.innerHTML = '<table><thead><tr><th>ID</th><th>Code</th><th>Type</th><th>Duration</th><th>Price</th><th>State</th><th>Actions</th></tr></thead><tbody>' +
+              v.map(function (item) {
+                return '<tr><td>' + (item.id || '—') + '</td>' +
+                  '<td>' + escapeHtml(item.code) + '</td>' +
+                  '<td><span class="badge badge-' + (item.type || 'standard') + '">' + (item.type || 'standard') + '</span></td>' +
+                  '<td>' + (item.duration_minutes || 0) + ' min</td>' +
+                  '<td>' + (item.price ? formatPrice(item.price) : '—') + '</td>' +
+                  '<td><span class="badge badge-' + (item.state || 'active') + '">' + (item.state || 'active') + '</span></td>' +
+                  '<td><button onclick="deleteVoucher(' + (item.id || 0) + ')">Delete</button></td></tr>';
+              }).join('') + '</tbody></table>';
+          })
+          .catch(function (err) {
+            els.tabVouchers.innerHTML = '<p class="error-msg">' + err.message + '</p>';
+          });
+      }
+
+      function loadSessions() {
+        els.tabSessions.innerHTML = '<p class="muted">Loading…</p>';
+        api('/api/admin/sessions')
+          .then(function (res) {
+            if (!res.ok) throw new Error(res.data.error || 'Failed');
+            var s = res.data.sessions || [];
+            if (!s.length) {
+              els.tabSessions.innerHTML = '<p class="muted">No active sessions.</p>';
+              return;
+            }
+            els.tabSessions.innerHTML = '<table><thead><tr><th>ID</th><th>MAC</th><th>Type</th><th>State</th><th>Expires</th><th>Actions</th></tr></thead><tbody>' +
+              s.map(function (item) {
+                return '<tr><td>' + escapeHtml(item.session_id || '—') + '</td>' +
+                  '<td>' + escapeHtml(item.client_mac || '—') + '</td>' +
+                  '<td><span class="badge badge-' + (item.voucher_type || 'standard') + '">' + (item.voucher_type || 'standard') + '</span></td>' +
+                  '<td>' + escapeHtml(item.state || '—') + '</td>' +
+                  '<td>' + (item.expires_at ? formatDate(item.expires_at) : '—') + '</td>' +
+                  '<td><button onclick="expireSession(\'' + (item.session_id || '') + '\')">Expire</button></td></tr>';
+              }).join('') + '</tbody></table>';
+          })
+          .catch(function (err) {
+            els.tabSessions.innerHTML = '<p class="error-msg">' + err.message + '</p>';
+          });
+      }
+
+      function renderCreateForm() {
+        els.tabCreate.innerHTML =
+          '<form id="create-form">' +
+          '<div class="form-row">' +
+          '<div><label>Type</label><select id="create-type" style="width:100%">' +
+          '<option value="standard">Standard</option>' +
+          '<option value="premium">Premium</option>' +
+          '</select></div>' +
+          '<div><label>Duration (min)</label><input id="create-duration" type="number" value="60" min="1" style="width:100%"></div>' +
+          '<div><label>Quantity</label><input id="create-quantity" type="number" value="1" min="1" max="100" style="width:100%"></div>' +
+          '<div><label>Price (centavos)</label><input id="create-price" type="number" value="" placeholder="optional" style="width:100%"></div>' +
+          '<div style="align-self:flex-end"><button type="submit" class="btn btn--primary">Create Voucher(s)</button></div>' +
+          '</div></form><div id="create-result"></div>';
+
+        var form = document.getElementById('create-form');
+        if (form) {
+          form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var type = document.getElementById('create-type').value;
+            var duration = parseInt(document.getElementById('create-duration').value, 10);
+            var quantity = parseInt(document.getElementById('create-quantity').value, 10);
+            var price = document.getElementById('create-price').value || null;
+            api('/api/admin/vouchers', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: type, durationMinutes: duration, quantity: quantity, price: price ? parseInt(price, 10) : null })
+            }).then(function (res) {
+              var result = document.getElementById('create-result');
+              if (res.ok) {
+                result.innerHTML = '<p class="success-msg">Created ' + res.data.created.length + ' voucher(s): ' + res.data.created.join(', ') + '</p>';
+                loadVouchers();
+              } else {
+                result.innerHTML = '<p class="error-msg">' + (res.data.error || 'Failed to create') + '</p>';
+              }
+            }).catch(function (err) {
+              document.getElementById('create-result').innerHTML = '<p class="error-msg">' + err.message + '</p>';
+            });
+          });
+        }
+      }
+
+      window.deleteVoucher = function (id) {
+        if (!confirm('Delete this voucher?')) return;
+        api('/api/admin/vouchers/' + id, { method: 'DELETE' })
+          .then(function (res) {
+            if (res.ok) loadVouchers(); else alert(res.data.error || 'Delete failed');
+          });
+      };
+
+      window.expireSession = function (sessionId) {
+        if (!confirm('Expire this session?')) return;
+        api('/api/admin/sessions/' + encodeURIComponent(sessionId) + '/expire', { method: 'POST' })
+          .then(function (res) {
+            if (res.ok) loadSessions(); else alert(res.data.error || 'Expire failed');
+          });
+      };
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        return String(str).replace(/[&<>"']/g, function (c) { return map[c]; });
+      }
+
+      function formatPrice(amount) {
+        return '\u20b1' + (amount / 100).toFixed(2);
+      }
+
+      function formatDate(iso) {
+        try { return new Date(iso).toLocaleString(); } catch (e) { return iso || ''; }
+      }
+
+      els.tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          els.tabs.forEach(function (t) { t.classList.remove('active'); });
+          tab.classList.add('active');
+          [].forEach.call([els.tabVouchers, els.tabSessions, els.tabCreate], function (c) { c.classList.remove('active'); });
+          var target = document.getElementById('tab-' + tab.getAttribute('data-tab'));
+          if (target) target.classList.add('active');
+          if (tab.getAttribute('data-tab') === 'vouchers') loadVouchers();
+          else if (tab.getAttribute('data-tab') === 'sessions') loadSessions();
+          else if (tab.getAttribute('data-tab') === 'create') renderCreateForm();
+        });
+      });
+
+      renderCreateForm();
+    })();
+  </script>
+</body>
+</html>

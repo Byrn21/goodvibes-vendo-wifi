@@ -12,9 +12,11 @@
 
 -- Voucher codes table
 CREATE TABLE IF NOT EXISTS vouchers (
-    id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
     code            VARCHAR(32) NOT NULL UNIQUE,
+    type            VARCHAR(16) NOT NULL DEFAULT 'standard', -- 'standard' | 'premium'
     duration_minutes INTEGER NOT NULL DEFAULT 60,
+    price           INTEGER, -- fixed price in centavos; NULL = use dynamic pricing
     state           VARCHAR(16) NOT NULL DEFAULT 'active',
     used_by_mac     VARCHAR(32),
     used_at         TIMESTAMP,
@@ -24,13 +26,15 @@ CREATE TABLE IF NOT EXISTS vouchers (
 
 -- Sessions table
 CREATE TABLE IF NOT EXISTS sessions (
-    id                  INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id          VARCHAR(32) NOT NULL UNIQUE,
     client_mac          VARCHAR(32) NOT NULL,
     client_ip           VARCHAR(45),
     ap_mac              VARCHAR(32),
     ssid_name           VARCHAR(64),
     duration_minutes    INTEGER NOT NULL DEFAULT 60,
+    voucher_type        VARCHAR(16) NOT NULL DEFAULT 'standard', -- 'standard' | 'premium'
+    total_duration_seconds INTEGER, -- preserves original duration for premium remaining-time tracking
     started_at          TIMESTAMP,
     expires_at          TIMESTAMP,
     paused_at           TIMESTAMP,
@@ -50,7 +54,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 -- Webhook events table
 CREATE TABLE IF NOT EXISTS webhook_events (
-    id           INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id     VARCHAR(128) NOT NULL UNIQUE,
     session_id   VARCHAR(32),
     provider     VARCHAR(16) DEFAULT 'paymongo',
@@ -70,7 +74,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_provider   ON sessions(provider_session_
 
 -- Admin users
 CREATE TABLE IF NOT EXISTS admin_users (
-    id            INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      VARCHAR(64) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     role          VARCHAR(16) DEFAULT 'admin',

@@ -28,7 +28,7 @@ const rawBodyParser = express.raw({ type: 'application/json', limit: '2mb' });
  */
 router.post('/create', async (req, res) => {
   try {
-    const { duration, clientMac, clientIp, apMac, ssidName, redirectUrl } = req.body;
+        const { duration, clientMac, clientIp, apMac, ssidName, redirectUrl, voucherType, planId } = req.body;
 
     if (!duration || !clientMac) {
       return res.status(400).json({
@@ -48,6 +48,8 @@ router.post('/create', async (req, res) => {
       ssidName: ssidName || '',
       duration: parseInt(duration, 10) || 60,
       voucherUsed: null,
+      voucherType: voucherType || 'standard',
+      totalDurationSeconds: Math.round((parseInt(duration, 10) || 60) * 60),
     };
 
     // Insert session record (initial state is 'active' from recordSession)
@@ -62,6 +64,8 @@ router.post('/create', async (req, res) => {
       apMac:    apMac || '',
       ssidName: ssidName || '',
       redirectUrl,
+      voucherType: voucherType || 'standard',
+      planId: planId || '',
     });
 
     // Transition session to pending_payment with provider session ID
@@ -93,13 +97,15 @@ router.post('/create', async (req, res) => {
  */
 router.post('/initiate', async (req, res) => {
   // Merge query-string params as fallback (GET-style redirect from frontend tiles)
-  const method = req.query.method || req.body.method;
+    const method = req.query.method || req.body.method;
   const plan   = req.query.plan   || req.body.plan;
   const clientMac = req.query.clientMac || req.body.clientMac;
   const clientIp  = req.query.clientIp  || req.body.clientIp;
   const apMac     = req.query.apMac     || req.body.apMac;
   const ssidName  = req.query.ssidName  || req.body.ssidName;
   const redirectUrl = req.query.redirectUrl || req.body.redirectUrl;
+  const voucherType = req.query.voucherType || req.body.voucherType || 'standard';
+  const planId    = req.query.planId || req.body.planId || '';
 
   try {
     if (!plan) {
@@ -109,11 +115,19 @@ router.post('/initiate', async (req, res) => {
       });
     }
 
-    const duration = parseInt(plan, 10);
+        const duration = parseInt(plan, 10);
     if (!duration || duration < 1) {
       return res.status(400).json({
         ok: false,
         error: 'invalid plan duration',
+      });
+    }
+
+    // Validate voucherType
+    if (voucherType !== 'standard' && voucherType !== 'premium') {
+      return res.status(400).json({
+        ok: false,
+      error: 'invalid voucherType — must be "standard" or "premium"',
       });
     }
 
@@ -127,6 +141,8 @@ router.post('/initiate', async (req, res) => {
       ssidName: ssidName || '',
       duration: duration,
       voucherUsed: null,
+      voucherType: voucherType,
+      totalDurationSeconds: Math.round(duration * 60),
     };
 
     await sessionService.recordSession(sessionData);
@@ -140,6 +156,8 @@ router.post('/initiate', async (req, res) => {
       apMac:     apMac || '',
       ssidName:  ssidName || '',
       redirectUrl,
+      voucherType: voucherType,
+      planId: planId,
     });
 
     await sessionService.markPaymentPending(sessionId, checkout.providerSessionId);

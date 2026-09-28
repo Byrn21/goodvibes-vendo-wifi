@@ -14,19 +14,31 @@
   <a href="#main-form" class="skip-link">Skip to login form</a>
 
   <div class="page-wrapper">
-    <!-- Header / Branding -->
-    <header class="portal-header" role="banner">
-      <div class="logo-container" aria-label="Network logo">
-        <svg class="logo-svg" width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <rect width="52" height="52" rx="14" fill="#2d6a4f"/>
-          <path d="M9 32 Q26 14 43 32" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M17 38 Q26 27 35 38" stroke="rgba(255,255,255,0.75)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-          <circle cx="26" cy="43" r="2.5" fill="white"/>
-        </svg>
-      </div>
-      <div class="brand-text">
-        <h1 class="brand-name" id="brand-name">GoodVibesVendoWifi</h1>
-        <p class="brand-tagline" id="brand-tagline">Connect to our Guest Network</p>
+        <!-- Header / Marquee Branding -->
+    <header class="portal-header portal-header--marquee" role="banner" aria-label="GoodVibesVendoWifi - Connect to our Guest Network">
+      <div class="marquee-track">
+        <div class="marquee-content">
+          <!-- First sequence -->
+          <span class="marquee-logo" aria-hidden="true">
+            <svg class="logo-svg" width="32" height="32" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="52" height="52" rx="14" fill="#2d6a4f"/>
+              <path d="M9 32 Q26 14 43 32" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M17 38 Q26 27 35 38" stroke="rgba(255,255,255,0.75)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+              <circle cx="26" cy="43" r="2.5" fill="white"/>
+            </svg>
+          </span>
+          <span class="marquee-text">GoodVibesVendoWifi</span>
+          <!-- Second sequence (duplicate for seamless loop) -->
+          <span class="marquee-logo" aria-hidden="true">
+            <svg class="logo-svg" width="32" height="32" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="52" height="52" rx="14" fill="#2d6a4f"/>
+              <path d="M9 32 Q26 14 43 32" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M17 38 Q26 27 35 38" stroke="rgba(255,255,255,0.75)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+              <circle cx="26" cy="43" r="2.5" fill="white"/>
+            </svg>
+          </span>
+          <span class="marquee-text">GoodVibesVendoWifi</span>
+        </div>
       </div>
     </header>
 
@@ -101,9 +113,11 @@
         </div>
       </div>
 
+
+
       <!-- ================================================================
-           VOUCHER / ACCESS CODE SECTION
-           ================================================================ -->
+            VOUCHER / ACCESS CODE SECTION
+            ================================================================ -->
       <section class="login-card" aria-labelledby="form-heading">
         <div class="card-header">
           <h2 id="form-heading" class="card-title">Welcome</h2>
@@ -187,6 +201,28 @@
             <p id="terms-error" class="form-error hidden" role="alert"></p>
           </div>
 
+                    <!-- Voucher type selector (paid mode) -->
+          <div id="voucher-type-section" class="form-group hidden">
+            <label for="voucher-type-select" class="form-label">Select Plan Type</label>
+            <select id="voucher-type-select" class="form-select" name="voucherType" aria-describedby="voucher-type-hint">
+              <option value="">— Choose a plan type —</option>
+                                          <optgroup label="Standard (continuous — no pause)">
+                <option value="standard-1h">1 Hour — ₱50</option>
+                <option value="standard-2h">2 Hours — ₱100</option>
+                <option value="standard-4h">4 Hours — ₱200</option>
+                <option value="standard-8h">8 Hours — ₱400</option>
+                <option value="standard-12h">12 Hours — ₱600</option>
+                <option value="standard-24h">24 Hours — ₱1,200</option>
+              </optgroup>
+              <optgroup label="Premium (consumable — pause &amp; resume)">
+                <option value="premium-5h">5 Hours — ₱375</option>
+                <option value="premium-8h">8 Hours — ₱600</option>
+                <option value="premium-24h">24 Hours — ₱1,800</option>
+              </optgroup>
+            </select>
+            <p id="voucher-type-hint" class="form-hint" aria-live="polite"></p>
+          </div>
+
           <!-- Plan selector (paid mode) -->
           <div id="plan-section" class="form-group hidden">
             <label for="plan-select" class="form-label">Select Duration</label>
@@ -213,75 +249,201 @@
             By connecting, you agree to our acceptable use policy.
           </p>
           </form>
-
-          <!-- Payment method tiles (paid mode) -->
-          <div class="payment-section">
-            <div class="auth-divider" role="separator" aria-hidden="true">Or pay with</div>
-            <div class="payment-tiles" role="group" aria-label="Payment methods">
-
-              <!-- GCash -->
-              <button
-                type="button"
-                class="payment-tile"
-                data-payment="gcash"
-                aria-label="Pay with GCash"
-              >
-                <div class="payment-tile__icon-wrap" aria-hidden="true">
-                  <img
-                    class="payment-tile__logo"
-                    src="assets/images/gcash.png"
-                    alt="GCash logo"
-                    width="40"
-                    height="40"
-                    loading="lazy"
-                  />
-                </div>
-                <span class="payment-tile__name">GCash</span>
-              </button>
-
-              <!-- Maya -->
-              <button
-                type="button"
-                class="payment-tile"
-                data-payment="maya"
-                aria-label="Pay with Maya"
-              >
-                <div class="payment-tile__icon-wrap" aria-hidden="true">
-                  <img
-                    class="payment-tile__logo"
-                    src="assets/images/maya.png"
-                    alt="Maya logo"
-                    width="40"
-                    height="40"
-                    loading="lazy"
-                  />
-                </div>
-                <span class="payment-tile__name">Maya</span>
-              </button>
-
-              <!-- QR Ph -->
-              <button
-                type="button"
-                class="payment-tile"
-                data-payment="qrph"
-                aria-label="Pay with QR Ph"
-              >
-                <div class="payment-tile__icon-wrap" aria-hidden="true">
-                  <img
-                    class="payment-tile__logo"
-                    src="assets/images/qrph.png"
-                    alt="QR Ph logo"
-                    width="40"
-                    height="40"
-                    loading="lazy"
-                  />
-                </div>
-                <span class="payment-tile__name">QR Ph</span>
-              </button>
-
-            </div><!-- /.payment-tiles -->
-          </div>
         </section>
+      <!-- ================================================================
+            PRICING TABLE
+            ================================================================ -->
+      <section class="pricing-section" aria-labelledby="pricing-heading">
+        <div class="pricing-container">
+          <h2 id="pricing-heading" class="pricing-title">Choose Your Plan</h2>
+          <div class="pricing-grid">
+
+            <!-- Standard Tier -->
+            <div class="pricing-tier">
+              <div class="tier-header tier-header--standard">
+                <span class="tier-badge tier-badge--standard">Standard</span>
+                <span class="tier-subtitle">Continuous - no pause</span>
+              </div>
+              <table class="pricing-table pricing-table--standard">
+                <colgroup>
+                  <col>
+                  <col>
+                  <col>
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Duration</th>
+                    <th class="text-right">Price</th>
+                    <th class="text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr data-tier="standard" data-duration="60" data-price="500" data-id="standard-1h">
+                    <td>1 Hour</td>
+                    <td class="text-right">₱5.00</td>
+                    <td class="text-center"><button type="button" class="btn btn--select btn--small" aria-label="Select 1 Hour plan - ₱5.00">Select</button><button type="button" class="btn btn--clear btn--small" aria-label="Clear selection">×</button></td>
+                  </tr>
+                  <tr data-tier="standard" data-duration="180" data-price="1000" data-id="standard-3h">
+                    <td>3 Hours</td>
+                    <td class="text-right">₱10.00</td>
+                    <td class="text-center"><button type="button" class="btn btn--select btn--small" aria-label="Select 3 Hours plan - ₱10.00">Select</button><button type="button" class="btn btn--clear btn--small" aria-label="Clear selection">×</button></td>
+                  </tr>
+                  <tr data-tier="standard" data-duration="720" data-price="2000" data-id="standard-12h">
+                    <td>12 Hours</td>
+                    <td class="text-right">₱20.00</td>
+                    <td class="text-center"><button type="button" class="btn btn--select btn--small" aria-label="Select 12 Hours plan - ₱20.00">Select</button><button type="button" class="btn btn--clear btn--small" aria-label="Clear selection">×</button></td>
+                  </tr>
+                  <tr data-tier="standard" data-duration="1440" data-price="3000" data-id="standard-1d">
+                    <td>24 Hours</td>
+                    <td class="text-right">₱30.00</td>
+                    <td class="text-center"><button type="button" class="btn btn--select btn--small" aria-label="Select 24 Hours plan - ₱30.00">Select</button><button type="button" class="btn btn--clear btn--small" aria-label="Clear selection">×</button></td>
+                  </tr>
+                  <tr data-tier="standard" data-duration="10080" data-price="1200000" data-id="standard-7d">
+                    <td>7 Days</td>
+                    <td class="text-right">₱120.00</td>
+                    <td class="text-center"><button type="button" class="btn btn--select btn--small" aria-label="Select 7 Days plan - ₱120.00">Select</button><button type="button" class="btn btn--clear btn--small" aria-label="Clear selection">×</button></td>
+                  </tr>
+                  <tr data-tier="standard" data-duration="43200" data-price="3500000" data-id="standard-30d">
+                    <td>30 Days</td>
+                    <td class="text-right">₱350.00</td>
+                    <td class="text-center"><button type="button" class="btn btn--select btn--small" aria-label="Select 30 Days plan - ₱350.00">Select</button><button type="button" class="btn btn--clear btn--small" aria-label="Clear selection">×</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Premium Tier -->
+            <div class="pricing-tier">
+              <div class="tier-header tier-header--premium">
+                <span class="tier-badge tier-badge--premium">Premium</span>
+                <span class="tier-subtitle">Pausable - 1 week validity to pause</span>
+              </div>
+              <table class="pricing-table pricing-table--premium">
+                <colgroup>
+                  <col>
+                  <col>
+                  <col>
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Duration</th>
+                    <th class="text-right">Price</th>
+                    <th class="text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr data-tier="premium" data-duration="300" data-price="2000" data-id="premium-5h">
+                    <td>5 Hours (Pausable)</td>
+                    <td class="text-right">₱20.00</td>
+                    <td class="text-center"><button type="button" class="btn btn--select btn--small" aria-label="Select 5 Hours Premium plan - ₱20.00">Select</button><button type="button" class="btn btn--clear btn--small" aria-label="Clear selection">×</button></td>
+                  </tr>
+                  <tr data-tier="premium" data-duration="720" data-price="4500" data-id="premium-12h">
+                    <td>12 Hours (Pausable)</td>
+                    <td class="text-right">₱45.00</td>
+                    <td class="text-center"><button type="button" class="btn btn--select btn--small" aria-label="Select 12 Hours Premium plan - ₱45.00">Select</button><button type="button" class="btn btn--clear btn--small" aria-label="Clear selection">×</button></td>
+                  </tr>
+                  <tr data-tier="premium" data-duration="1440" data-price="8000" data-id="premium-24h">
+                    <td>24 Hours (Pausable)</td>
+                    <td class="text-right">₱80.00</td>
+                    <td class="text-center"><button type="button" class="btn btn--select btn--small" aria-label="Select 24 Hours Premium plan - ₱80.00">Select</button><button type="button" class="btn btn--clear btn--small" aria-label="Clear selection">×</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+            </section>
+
+      <!-- ================================================================
+            PAYMENT METHOD TILES
+            ================================================================ -->
+      <section class="payment-method-section">
+        <div class="payment-section">
+          <div class="auth-divider" role="separator" aria-hidden="true">Or pay with</div>
+          <div class="payment-tiles" role="group" aria-label="Payment methods">
+
+            <!-- GCash -->
+            <button
+              type="button"
+              class="payment-tile"
+              data-payment="gcash"
+              aria-label="Pay with GCash"
+            >
+              <div class="payment-tile__icon-wrap" aria-hidden="true">
+                <img
+                  class="payment-tile__logo"
+                  src="assets/images/gcash.png"
+                  alt="GCash logo"
+                  width="40"
+                  height="40"
+                  loading="lazy"
+                />
+              </div>
+              <span class="payment-tile__name">GCash</span>
+            </button>
+
+            <!-- Maya -->
+            <button
+              type="button"
+              class="payment-tile"
+              data-payment="maya"
+              aria-label="Pay with Maya"
+            >
+              <div class="payment-tile__icon-wrap" aria-hidden="true">
+                <img
+                  class="payment-tile__logo"
+                  src="assets/images/maya.png"
+                  alt="Maya logo"
+                  width="40"
+                  height="40"
+                  loading="lazy"
+                />
+              </div>
+              <span class="payment-tile__name">Maya</span>
+            </button>
+
+            <!-- QR Ph -->
+            <button
+              type="button"
+              class="payment-tile"
+              data-payment="qrph"
+              aria-label="Pay with QR Ph"
+            >
+              <div class="payment-tile__icon-wrap" aria-hidden="true">
+                <img
+                  class="payment-tile__logo"
+                  src="assets/images/qrph.png"
+                  alt="QR Ph logo"
+                  width="40"
+                  height="40"
+                  loading="lazy"
+                />
+              </div>
+              <span class="payment-tile__name">QR Ph</span>
+            </button>
+            <button
+              type="button"
+              class="payment-tile"
+              data-payment="coming soon"
+              aria-label="Coming soon"
+            >
+              <div class="payment-tile__icon-wrap" aria-hidden="false">
+                <img
+                  class="payment-tile__logo"
+                  src="assets/images/coming soon.png"
+                  alt="coming soon"
+                  width="40"
+                  height="40"
+                  loading="lazy"
+                />
+              </div>
+              <span class="payment-tile__name">Coming soon</span>
+            </button>
+
+          </div><!-- /.payment-tiles -->
+        </div>
+      </section>
 
       <footer class="portal-footer" role="contentinfo">
         <p class="support-info" id="support-info">

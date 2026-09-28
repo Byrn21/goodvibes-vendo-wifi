@@ -25,14 +25,22 @@ const PAYMONGO_BASE     = process.env.PAYMENT_BASE_URL        || 'https://api.pa
 const PAYMONGO_CHECKOUT = process.env.PAYMENT_CHECKOUT_URL    || 'https://checkout.paymongo.com';
 
 const PRICE_PER_HOUR    = parseInt(process.env.PRICE_PER_HOUR || '5000', 10); // in cents/smallest unit
+const PREMIUM_MODIFIER  = parseFloat(process.env.PREMIUM_PRICE_MODIFIER || '1.5');
 
 /**
  * Calculate the charge amount for a given duration.
  * Simple pricing: price per hour, pro-rated with a minimum of 15 minutes.
  */
-function calculateAmount(durationMinutes) {
+function calculateAmount(durationMinutes, voucherType) {
+  voucherType = voucherType || 'standard';
   const hours = Math.max(0.25, durationMinutes / 60);
-  return Math.round(hours * PRICE_PER_HOUR);
+  let amount = Math.round(hours * PRICE_PER_HOUR);
+
+  if (voucherType === 'premium') {
+    amount = Math.round(amount * PREMIUM_MODIFIER);
+  }
+
+  return amount;
 }
 
 /**
@@ -42,15 +50,16 @@ function calculateAmount(durationMinutes) {
  *   @param {string} [opts.method] - Single payment method ('gcash'|'maya'|'qrph'). If omitted, all methods are offered.
  * @returns {Promise<{ checkoutUrl: string, providerSessionId: string }>}
  */
-async function createPaymentCheckout({ sessionId, duration, method, clientMac, clientIp, apMac, ssidName, redirectUrl }) {
-  const amount = calculateAmount(duration);
+async function createPaymentCheckout({ sessionId, duration, method, clientMac, clientIp, apMac, ssidName, redirectUrl, voucherType, planId }) {
+  voucherType = voucherType || 'standard';
+  const amount = calculateAmount(duration, voucherType);
 
   const successUrl = `${BASE_URL}/success.html?sessionId=${encodeURIComponent(sessionId)}&redirectUrl=${encodeURIComponent(redirectUrl || '')}`;
   const cancelUrl  = `${BASE_URL}/index.html?cancelled=1`;
 
   switch (PROVIDER) {
     case 'paymongo':
-      return createPaymongoCheckout({ sessionId, duration, amount, successUrl, cancelUrl, clientIp, method });
+            return createPaymongoCheckout({ sessionId, duration, amount, successUrl, cancelUrl, clientIp, method, voucherType, planId });
     default:
       throw new Error('Unknown payment provider: ' + PROVIDER);
   }
@@ -103,7 +112,7 @@ async function handlePaymentEvent(event, provider) {
     return 'ignored';
   }
 
-  const { sessionId, eventId, eventType, amount, status } = parsed;
+    const { sessionId, eventId, eventType, amount, status, voucherType } = parsed;
 
   // Import session service lazily to avoid circular dependency
   const { isEventProcessed, markEventProcessed, activatePaidSession, markPaymentFailed } = require('./session');
@@ -115,8 +124,8 @@ async function handlePaymentEvent(event, provider) {
 
   await markEventProcessed(eventId, sessionId);
 
-  if (status === 'paid' || status === 'succeeded' || eventType === 'payment.paid') {
-    await activatePaidSession(sessionId, eventId, amount);
+    if (status === 'paid' || status === 'succeeded' || eventType === 'payment.paid') {
+    await activatePaidSession(sessionId, eventId, amount, voucherType);
     return 'confirmed';
   }
 
@@ -138,7 +147,7 @@ async function handlePaymentEvent(event, provider) {
  * @param {Object} opts - { sessionId, duration, amount, successUrl, cancelUrl, clientIp }
  * @returns {Promise<{ checkoutUrl: string, providerSessionId: string }>}
  */
-async function createPaymongoCheckout({ sessionId, duration, amount, successUrl, cancelUrl, clientIp, method }) {
+async function createPaymongoCheckout({ sessionId, duration, amount, successUrl, cancelUrl, clientIp, method, voucherType, planId }) {
   // Filter to the user-selected payment method, or offer all three if none specified
   var paymentMethodTypes = ['gcash', 'maya', 'qrph'];
   if (method && paymentMethodTypes.indexOf(method) !== -1) {
@@ -151,10 +160,10 @@ async function createPaymongoCheckout({ sessionId, duration, amount, successUrl,
         send_email_receipt: true,
         show_description: true,
         show_line_items: true,
-        line_items: [
+                line_items: [
           {
-            name:        `WiFi Access (${duration} min)`,
-            description: `Wireless internet access for ${duration} minutes`,
+            name:        `WiFi Access (${voucherType === 'premium' ? 'Premium' : 'Standard'} — ${duration} min)`,
+            description: `Wireless internet access for ${duration} minutes (${voucherType || 'standard'})${planId ? ' — ' + planId : ''}`,
             quantity:    1,
             amount:      amount,
             currency:    'PHP',
@@ -163,10 +172,12 @@ async function createPaymongoCheckout({ sessionId, duration, amount, successUrl,
         payment_method_types: paymentMethodTypes,
         success_url:  successUrl,
         cancel_url:   cancelUrl,
-        metadata: {
+                metadata: {
           session_id:       sessionId,
           duration_minutes: duration,
           client_ip:        clientIp || '',
+          voucher_type:     voucherType || 'standard',
+          plan_id:          planId || '',
         },
       },
     },
@@ -253,15 +264,16 @@ function parsePayMongoEvent(event) {
     const eventId    = eventData.id || '';
     const eventType  = attr.type || '';
 
-    const metadata = (attr.data && attr.data.attributes && attr.data.attributes.metadata) || {};
+        const metadata = (attr.data && attr.data.attributes && attr.data.attributes.metadata) || {};
     const amount    = (attr.data && attr.data.attributes && attr.data.attributes.amount) || 0;
     const sessionId = metadata.session_id || '';
+    const voucherType = metadata.voucher_type || 'standard';
 
     let status = 'unknown';
     if (eventType === 'payment.paid')   status = 'paid';
     if (eventType === 'payment.failed') status = 'failed';
 
-        return { sessionId, eventId, eventType, amount, status };
+        return { sessionId, eventId, eventType, amount, status, voucherType };
   } catch {
     return null;
   }
@@ -309,6 +321,7 @@ function paymongoRequest(method, path, body) {
 
 module.exports = {
   createPaymentCheckout,
+  calculateAmount,
   verifyWebhook,
   handlePaymentEvent,
 
@@ -318,5 +331,7 @@ module.exports = {
     verifyPayMongoSignature,
     parsePayMongoEvent,
     PROVIDER,
+    PRICE_PER_HOUR,
+    PREMIUM_MODIFIER,
   },
 };

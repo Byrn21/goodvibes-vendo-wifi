@@ -176,6 +176,65 @@ body {
   margin-top: 2px;
 }
 
+/* ---- Marquee Header ---- */
+.portal-header--marquee {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 16px 12px;
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+  border-bottom: 2px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.marquee-track {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  overflow: hidden;
+}
+
+.marquee-content {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  width: max-content;
+  animation: marquee-scroll 16s linear infinite;
+}
+
+.marquee-logo {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.marquee-logo .logo-svg {
+  width: 32px;
+  height: 32px;
+}
+
+.marquee-text {
+  flex-shrink: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(calc(-50% - 12px));
+  }
+}
+
 /* ---- Main / Footer ---- */
 .portal-main {
   flex: 1;
@@ -225,7 +284,7 @@ body {
   box-shadow: var(--shadow-card);
   padding: 24px 20px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid var(--border-light);
 }
 
@@ -569,6 +628,40 @@ body {
 .btn--warning:hover:not(:disabled) { background: #fff3cd; }
 
 .btn--full { width: 100%; }
+
+.btn--small {
+  height: 24px;
+  padding: 0 4px;
+  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+}
+
+/* Clear / Reset button (next to Select in pricing table) */
+.btn--clear {
+  height: 32px;
+  width: 32px;
+  padding: 0;
+  font-size: 1.2rem;
+  line-height: 1;
+  border: 1px solid var(--border-light);
+  background: var(--surface-2);
+  color: var(--text-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.btn--clear:hover {
+  color: var(--danger, #e03131);
+  border-color: var(--danger, #e03131);
+  background: rgba(224, 49, 49, 0.05);
+}
+.btn--clear:focus-visible {
+  outline: 2px solid var(--danger, #e03131);
+  outline-offset: 2px;
+}
 
 .btn-icon { flex-shrink: 0; }
 .btn-icon--right { margin-left: auto; }
@@ -1038,9 +1131,158 @@ body {
 /* ---- Utility ---- */
 .hidden { display: none !important; }
 
+/* ---- Pricing Table ---- */
+.pricing-section {
+  margin: 16px 0;
+  width: 100%;
+  overflow: visible;
+}
+
+.pricing-container {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-light);
+  padding: 20px;
+  overflow: visible;
+}
+
+.pricing-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 16px;
+  line-height: 1.3;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.pricing-tier {
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  border: 1px solid var(--border-light);
+}
+
+.tier-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tier-badge--standard {
+  background: rgba(92, 61, 17, 0.1);
+  color: var(--primary);
+}
+
+.tier-badge--premium {
+  background: rgba(45, 106, 79, 0.1);
+  color: var(--green);
+}
+
+.tier-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-2);
+  font-style: italic;
+}
+
+.pricing-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  table-layout: fixed;
+}
+.pricing-table colgroup col {
+  /* Duration: ~30%, Price: ~25%, Action: ~45% */
+}
+.pricing-table col:nth-child(1) { width: 30%; }
+.pricing-table col:nth-child(2) { width: 25%; }
+.pricing-table col:nth-child(3) { width: 45%; }
+
+.pricing-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 2px solid var(--border);
+  min-width: 0;
+}
+
+.pricing-table th.text-right { text-align: right; min-width: 0; }
+.pricing-table th.text-center { text-align: center; min-width: 0; }
+
+.pricing-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text);
+  min-width: 0;
+}
+
+.pricing-table td.text-right { text-align: right; min-width: 2; }
+.pricing-table td.text-center {
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: -8px;
+}
+.pricing-table td.text-center .btn {
+  flex-shrink: 1;
+}
+
+.pricing-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.pricing-table tbody tr:hover td {
+  background: rgba(92, 61, 17, 0.03);
+}
+
+.pricing-table tbody tr.is-selected td {
+  background: rgba(92, 61, 17, 0.08);
+}
+
+.pricing-table tbody tr.is-selected {
+  border-left: 3px solid var(--green);
+}
+
 /* ---- Payment tiles ---- */
+.payment-method-section {
+  margin-top: 8px;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-light);
+}
+
 .payment-section {
-  margin-top: 24px;
+  width: 100%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.payment-section--visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .payment-tiles {
@@ -1139,8 +1381,16 @@ body {
 
   .login-card, .status-card, .success-card, .error-card { padding: 32px 28px; }
 
-  .brand-name { font-size: 1.25rem; }
+    .brand-name { font-size: 1.25rem; }
 
+  /* Marquee header - responsive */
+  .marquee-text { font-size: 1.5rem; }
+
+  /* Pricing table - responsive */
+  .pricing-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .pricing-title { font-size: 1.25rem; }
 
   .countdown-number { font-size: 3rem; }
   .countdown-sep     { font-size: 3rem; }
@@ -1180,4 +1430,5 @@ body {
     transition-duration: 0.01ms !important;
   }
   .carousel__track { transition: none; }
+  .marquee-content { animation: none; }
 }

@@ -122,7 +122,7 @@
         if (infoBox && sidEl) {
           sidEl.textContent = sessionId;
           infoBox.classList.remove('hidden');
-          if (statusLink) statusLink.href = 'status.html?sessionId=' + encodeURIComponent(sessionId);
+                    if (statusLink) statusLink.href = 'status.html?sessionId=' + encodeURIComponent(sessionId) + (params.get('voucherType') ? '&voucherType=' + encodeURIComponent(params.get('voucherType')) : '');
         }
       }
     })();

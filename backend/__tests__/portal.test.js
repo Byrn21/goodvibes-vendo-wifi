@@ -32,7 +32,7 @@ describe('Query Parameter Parsing', () => {
     var result = parseQueryParams(
       'clientMac=aa%3Abb%3Acc%3Add%3Aee%3Aff&clientIp=192.168.1.100&ssidName=HotelGuest&redirectUrl=https%3A%2F%2Fgoogle.com'
     );
-    expect(result.clientMac).toBe('aa:Bb:Cc:Dd:Ee:Ff'); // note: decodeURIComponent
+        expect(result.clientMac).toBe('aa:bb:cc:dd:ee:ff'); // normalizeMac lowercases
     expect(result.clientIp).toBe('192.168.1.100');
     expect(result.ssidName).toBe('HotelGuest');
     expect(result.redirectUrl).toBe('https://google.com');
@@ -137,7 +137,7 @@ describe('Redirect Allowlist Validation', () => {
 
   test('blocks off-domain redirects', () => {
     expect(isAllowedRedirect('https://evil.com/page', ['example.com'])).toBe(false);
-    expect(isAllowedRedirect('https://example.com.evil.com/page', ['example.com'])).toBe(true); // tricky: subdomain of attacker
+        expect(isAllowedRedirect('https://example.com.evil.com/page', ['example.com'])).toBe(false); // security: blocks attacker subdomain
     // This is a known limitation — use exact match for top-level
   });
 

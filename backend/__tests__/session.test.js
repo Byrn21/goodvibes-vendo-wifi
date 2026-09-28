@@ -85,11 +85,13 @@ describe('Session State Machine', () => {
     expect(retrieved.sessionId).toBe('sess_test_001');
   });
 
-  test('pause freezes session and records remaining time', async () => {
+    test('pause freezes session and records remaining time', async () => {
     await sessionService.recordSession({
       sessionId: 'sess_pause_001',
       clientMac: 'aa:bb:cc:dd:ee:ff',
       duration: 60,
+      voucherType: 'premium',
+      totalDurationSeconds: 3600,
     });
 
     // Manually fast-forward expiresAt in the DB (30 min left)
@@ -110,6 +112,8 @@ describe('Session State Machine', () => {
       sessionId: 'sess_resume_001',
       clientMac: 'aa:bb:cc:dd:ee:ff',
       duration: 60,
+      voucherType: 'premium',
+      totalDurationSeconds: 3600,
     });
 
         // Force the session into a paused state with 1500s remaining
@@ -142,8 +146,8 @@ describe('Session State Machine', () => {
     expect(s.state).toBe('expired');
   });
 
-  test('pause rejects non-active session', async () => {
-    await expect(sessionService.pauseSession('nonexistent')).rejects.toThrow('Session not active');
+    test('pause rejects non-active session', async () => {
+    await expect(sessionService.pauseSession('nonexistent')).rejects.toThrow('Session not found');
   });
 
   test('resume rejects non-paused session', async () => {

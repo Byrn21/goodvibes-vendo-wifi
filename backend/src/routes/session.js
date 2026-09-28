@@ -15,6 +15,7 @@ const {
   resumeSession,
   expireSession,
   isSessionActive,
+  getPauseRemaining,
 } = require('../services/session');
 const omadaService = require('../services/omada');
 
@@ -48,13 +49,13 @@ router.get('/status', async (req, res, next) => {
         try {
           await omadaService.unauthenticateClient({ clientMac: session.clientMac });
         } catch (_) { /* ignore */ }
-        return res.json({
+                return res.json({
           sessionId,
           state: 'expired',
           remainingSeconds: 0,
           startedAt: session.startedAt,
           expiresAt: session.expiresAt,
-          plan: session.plan,
+          voucherType: session.voucherType || 'standard',
           canPause: false,
           canResume: false,
         });
@@ -63,16 +64,19 @@ router.get('/status', async (req, res, next) => {
 
     const remainingSeconds = computeRemaining(session, serverTime);
 
-    return res.json({
+        return res.json({
       sessionId: session.sessionId,
       state: session.state,
       remainingSeconds,
       startedAt: session.startedAt,
       expiresAt: session.expiresAt,
-      plan: session.plan,
-      totalSeconds: (session.duration || 60) * 60,
-      canPause:  session.state === 'active' && remainingSeconds > 60,
+      voucherType: session.voucherType || 'standard',
+      totalSeconds: (session.totalDurationSeconds || (session.duration || 60) * 60),
+      canPause:  session.state === 'active' && remainingSeconds > 60 && session.voucherType === 'premium',
       canResume: session.state === 'paused',
+      pauseValidRemainingSeconds: session.state === 'paused' && session.voucherType === 'premium'
+        ? await getPauseRemaining(sessionId)
+        : null,
     });
   } catch (err) {
     next(err);
@@ -96,16 +100,21 @@ router.post('/pause', async (req, res, next) => {
     if (!session) {
       return res.status(404).json({ success: false, error: 'Session not found.' });
     }
-    if (session.state !== 'active') {
+        if (session.state !== 'active') {
       return res.status(409).json({ success: false, error: 'Session is not active.', code: 'INVALID_STATE' });
     }
+    if (session.voucherType !== 'premium') {
+      return res.status(403).json({ success: false, error: 'Pause is only available for Premium sessions.', code: 'PREMIUM_ONLY' });
+    }
 
-    const paused = await pauseSession(sessionId);
+        const paused = await pauseSession(sessionId);
     return res.json({
       success: true,
       state: 'paused',
+      voucherType: paused.voucherType || 'standard',
       remainingSeconds: computeRemaining(paused, Math.floor(Date.now() / 1000)),
       pausedAt: paused.pausedAt,
+      pauseValidRemainingSeconds: await getPauseRemaining(sessionId),
     });
   } catch (err) {
     next(err);
@@ -125,14 +134,18 @@ router.post('/resume', async (req, res, next) => {
     if (!session) {
       return res.status(404).json({ success: false, error: 'Session not found.' });
     }
-    if (session.state !== 'paused') {
+        if (session.state !== 'paused') {
       return res.status(409).json({ success: false, error: 'Session is not paused.', code: 'INVALID_STATE' });
     }
+    if (session.voucherType !== 'premium') {
+      return res.status(403).json({ success: false, error: 'Resume is only available for Premium sessions.', code: 'PREMIUM_ONLY' });
+    }
 
-    const resumed = await resumeSession(sessionId);
+        const resumed = await resumeSession(sessionId);
     return res.json({
       success: true,
       state: 'active',
+      voucherType: resumed.voucherType || 'standard',
       remainingSeconds: computeRemaining(resumed, Math.floor(Date.now() / 1000)),
       expiresAt: resumed.expiresAt,
     });
@@ -188,7 +201,7 @@ function computeRemaining(session, serverTime) {
 
   // Fallback: use startedAt + duration
   const startedAt = Math.floor(new Date(session.startedAt).getTime() / 1000);
-  const durationSecs = (session.duration || 60) * 60;
+  const durationSecs = session.totalDurationSeconds || (session.duration || 60) * 60;
   return Math.max(0, (startedAt + durationSecs) - serverTime);
 }
 

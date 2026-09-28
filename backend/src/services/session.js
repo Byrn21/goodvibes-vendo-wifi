@@ -16,6 +16,7 @@ const { getDb } = require('../db/client');
 
 const DEFAULT_DURATION = parseInt(process.env.DEFAULT_SESSION_DURATION || '60', 10);
 const EXPIRE_CHECK_INTERVAL = parseInt(process.env.SESSION_ENFORCE_INTERVAL || '60000', 10);
+const PREMIUM_PAUSE_VALIDITY_HOURS = parseInt(process.env.PREMIUM_PAUSE_VALIDITY_HOURS || '168', 10);
 let expirationTimer = null;
 
 /**
@@ -35,8 +36,8 @@ function normalizeMac(mac) {
 async function validateVoucher(voucher, clientMac) {
   const db = getDb();
 
-  const row = await db.getOne(`
-    SELECT id, code, duration_minutes, state, used_by_mac, expires_at
+    const row = await db.getOne(`
+    SELECT id, code, duration_minutes, type, state, used_by_mac, expires_at
     FROM vouchers
     WHERE code = ? 
     LIMIT 1
@@ -74,7 +75,7 @@ async function validateVoucher(voucher, clientMac) {
     WHERE id = ?
   `, [clientMac || '', row.id]);
 
-  return { valid: true, duration: row.duration_minutes, message: 'Voucher accepted.' };
+    return { valid: true, duration: row.duration_minutes, type: row.type || 'standard', message: 'Voucher accepted.' };
 }
 
 /**
@@ -82,18 +83,18 @@ async function validateVoucher(voucher, clientMac) {
  */
 async function recordSession({
   sessionId, clientMac, clientIp, apMac, ssidName,
-  duration, voucherUsed,
+  duration, voucherUsed, voucherType, totalDurationSeconds,
 }) {
   const db = getDb();
   const now = new Date().toISOString();
   const expiresAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
 
-  await db.run(`
+    await db.run(`
     INSERT INTO sessions (
       session_id, client_mac, client_ip, ap_mac, ssid_name,
-      duration_minutes, started_at, expires_at, state,
+      duration_minutes, voucher_type, total_duration_seconds, started_at, expires_at, state,
       voucher_used, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
   `, [
     sessionId,
     clientMac || '',
@@ -101,6 +102,8 @@ async function recordSession({
     apMac || '',
     ssidName || '',
     duration,
+    voucherType || 'standard',
+    totalDurationSeconds || null,
     now,
     expiresAt,
     voucherUsed || null,
@@ -130,7 +133,9 @@ async function getSession(sessionId) {
     clientIp: row.client_ip,
     apMac: row.ap_mac,
     ssidName: row.ssid_name,
-    duration: row.duration_minutes,
+        duration: row.duration_minutes,
+    voucherType: row.voucher_type || 'standard',
+    totalDurationSeconds: row.total_duration_seconds,
     startedAt: row.started_at,
     expiresAt: row.expires_at,
     pausedAt: row.paused_at,
@@ -200,8 +205,30 @@ async function pauseSession(sessionId) {
   const db = getDb();
   const session = await getSession(sessionId);
 
-  if (!session || session.state !== 'active') {
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  if (session.state !== 'active') {
     throw new Error('Session not active');
+  }
+
+  // Premium-only: standard vouchers do not support pause
+  if (session.voucherType !== 'premium') {
+    const err = new Error('Pause is only available for Premium sessions');
+    err.code = 'PREMIUM_ONLY';
+    throw err;
+  }
+
+  // Enforce pause validity window for premium sessions
+  if (session.pausedAt) {
+    const pauseAgeHours = (Date.now() - new Date(session.pausedAt).getTime()) / (1000 * 60 * 60);
+    if (pauseAgeHours >= PREMIUM_PAUSE_VALIDITY_HOURS) {
+      await expireSession(sessionId, 'pause_expired');
+      const expiredErr = new Error('Pause validity period has expired');
+      expiredErr.code = 'PAUSE_EXPIRED';
+      throw expiredErr;
+    }
   }
 
   const now = new Date();
@@ -242,8 +269,10 @@ async function resumeSession(sessionId) {
     throw new Error('Session not paused');
   }
 
-  const remaining = session.remainingSeconds || (session.duration || 60) * 60;
+    const remaining = session.remainingSeconds || (session.duration || 60) * 60;
   const expiresAt = new Date(Date.now() + remaining * 1000).toISOString();
+
+  const username = (session.voucherType === 'premium' ? 'prem_' : 'paid_') + sessionId;
 
   // Re-authenticate via Omada
   try {
@@ -252,7 +281,7 @@ async function resumeSession(sessionId) {
       clientIp: session.clientIp,
       apMac: session.apMac,
       ssidName: session.ssidName,
-      username: 'paid_' + sessionId,
+      username: username,
       password: sessionId,
       sessionId,
     });
@@ -295,7 +324,7 @@ function startExpirationWorker() {
     const db = getDb();
     const now = new Date().toISOString();
 
-    const expiredSessions = await db.query(`
+        const expiredSessions = await db.query(`
       SELECT session_id FROM sessions
       WHERE state = 'active' AND expires_at IS NOT NULL AND expires_at <= ?
     `, [now]);
@@ -304,8 +333,22 @@ function startExpirationWorker() {
       await expireSession(row.session_id, 'time_expired');
     }
 
+    // Also expire premium sessions paused beyond the validity window
+    const maxPausedAt = new Date(Date.now() - PREMIUM_PAUSE_VALIDITY_HOURS * 60 * 60 * 1000).toISOString();
+    const stalePaused = await db.query(`
+      SELECT session_id FROM sessions
+      WHERE state = 'paused' AND voucher_type = 'premium' AND paused_at IS NOT NULL AND paused_at <= ?
+    `, [maxPausedAt]);
+
+    for (const row of stalePaused) {
+      await expireSession(row.session_id, 'pause_expired');
+    }
+
     if (expiredSessions.length > 0) {
       console.log(`[expiration-worker] Expired ${expiredSessions.length} session(s)`);
+    }
+    if (stalePaused.length > 0) {
+      console.log(`[expiration-worker] Expired ${stalePaused.length} paused premium session(s) past validity window`);
     }
   }, EXPIRE_CHECK_INTERVAL);
 
@@ -344,7 +387,7 @@ async function markPaymentPending(sessionId, providerSessionId) {
  * activatePaidSession — Activate a session after successful payment.
  * Sets state to 'active', records payment details, and authenticates via Omada.
  */
-async function activatePaidSession(sessionId, eventId, amount) {
+async function activatePaidSession(sessionId, eventId, amount, webhookVoucherType) {
   const db = getDb();
   const now = new Date().toISOString();
 
@@ -354,9 +397,18 @@ async function activatePaidSession(sessionId, eventId, amount) {
     throw new Error('Session not found for payment activation');
   }
 
-  const duration = session.duration;
-  const expiresAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
-  const username = 'paid_' + sessionId;
+        const duration = session.duration;
+  const voucherType = session.voucherType || webhookVoucherType || 'standard';
+
+  // Compute expiry: for premium, use remainingSeconds if already set (from pause); otherwise full duration
+  let expiresAt;
+  if (voucherType === 'premium' && session.totalDurationSeconds) {
+    const remaining = session.remainingSeconds || session.totalDurationSeconds;
+    expiresAt = new Date(Date.now() + remaining * 1000).toISOString();
+  } else {
+    expiresAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
+  }
+  const username = (voucherType === 'premium' ? 'prem_' : 'paid_') + sessionId;
 
   // Authenticate via Omada
   await omadaService.authenticateClient({
@@ -369,16 +421,17 @@ async function activatePaidSession(sessionId, eventId, amount) {
     sessionId: sessionId,
   });
 
-  await db.run(`
+    await db.run(`
     UPDATE sessions
     SET state = 'active',
         payment_event_id = ?,
         payment_amount = ?,
+        voucher_type = ?,
         started_at = ?,
         expires_at = ?,
         updated_at = ?
     WHERE session_id = ?
-  `, [eventId || null, amount || null, now, expiresAt, now, sessionId]);
+  `, [eventId || null, amount || null, voucherType, now, expiresAt, now, sessionId]);
 
   return await getSession(sessionId);
 }
@@ -433,6 +486,25 @@ async function markEventProcessed(eventId, sessionId) {
   }
 }
 
+/**
+ * getPauseRemaining — Calculate seconds remaining in the pause validity window.
+ * Only meaningful for premium sessions in 'paused' state.
+ *
+ * @param {string} sessionId
+ * @returns {Promise<number|null>} seconds remaining, or null if not applicable
+ */
+async function getPauseRemaining(sessionId) {
+  const session = await getSession(sessionId);
+  if (!session || session.state !== 'paused' || session.voucherType !== 'premium') {
+    return null;
+  }
+  if (!session.pausedAt) return null;
+
+  const pauseValidUntil = new Date(session.pausedAt).getTime() + PREMIUM_PAUSE_VALIDITY_HOURS * 60 * 60 * 1000;
+  const remaining = Math.max(0, Math.floor((pauseValidUntil - Date.now()) / 1000));
+  return remaining;
+}
+
 module.exports = {
   validateVoucher,
   recordSession,
@@ -447,6 +519,7 @@ module.exports = {
   markPaymentPending,
   activatePaidSession,
   markPaymentFailed,
-  isEventProcessed,
+    isEventProcessed,
   markEventProcessed,
+  getPauseRemaining,
 };

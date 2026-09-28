@@ -52,10 +52,14 @@
       authUrl:     'authUrl',
       targetUrl:   'targetUrl',
     },
-    supportEmail: 'support@example.com',
+        supportEmail: 'support@example.com',
     supportPhone: '',
     mockMode: false,
     mockSuccessDelay: 800,
+    pricingPlans: {
+      standard: [],
+      premium: [],
+    },
   };
 
   // Merge config with defaults
@@ -263,8 +267,57 @@
     var loadingOverlay = $('loading-overlay');
     var loadingText = $('loading-text');
 
-    var voucherVal = voucherInput ? voucherInput.value : '';
+        var voucherVal = voucherInput ? voucherInput.value : '';
     var termsChecked = termsCheckbox ? termsCheckbox.checked : true;
+
+        // Check if we're in paid/backend mode with plan selection
+    var selectedType = getSelectedVoucherType();
+
+    // Check for pricing table selection
+    var pricingPlan = null;
+    var pricingInput = document.querySelector('input[name="selectedPlan"]');
+    if (pricingInput && pricingInput.value) {
+      try {
+        pricingPlan = JSON.parse(pricingInput.value);
+      } catch (e) {
+        pricingPlan = null;
+      }
+    }
+
+    // ---- Paid mode: redirect to payment checkout ----
+    if (CONFIG.mode === 'backend' && selectedType && selectedType.tier) {
+      var checkoutUrl = (CONFIG.apiBaseUrl || '') + '/api/payment/initiate?' + [
+        'voucherType=' + encodeURIComponent(selectedType.tier),
+        'planId=' + encodeURIComponent(selectedType.planId),
+        'plan=' + encodeURIComponent($('plan-select').value),
+        'clientMac=' + encodeURIComponent(queryParams.clientMac || ''),
+        'clientIp=' + encodeURIComponent(queryParams.clientIp || ''),
+        'apMac=' + encodeURIComponent(queryParams.apMac || ''),
+        'ssidName=' + encodeURIComponent(queryParams.ssidName || ''),
+        'redirectUrl=' + encodeURIComponent(getRedirectDestination()),
+      ].join('&');
+
+            window.location.href = checkoutUrl;
+      return;
+    }
+
+    // ---- Pricing table selection: redirect to payment checkout ----
+    if (pricingPlan && pricingPlan.tier) {
+      var pricingCheckoutUrl = (CONFIG.apiBaseUrl || '') + '/api/payment/initiate?' + [
+        'voucherType=' + encodeURIComponent(pricingPlan.tier),
+        'planId=' + encodeURIComponent(pricingPlan.planId),
+        'duration=' + encodeURIComponent(pricingPlan.duration),
+        'price=' + encodeURIComponent(pricingPlan.price),
+        'clientMac=' + encodeURIComponent(queryParams.clientMac || ''),
+        'clientIp=' + encodeURIComponent(queryParams.clientIp || ''),
+        'apMac=' + encodeURIComponent(queryParams.apMac || ''),
+        'ssidName=' + encodeURIComponent(queryParams.ssidName || ''),
+        'redirectUrl=' + encodeURIComponent(getRedirectDestination()),
+      ].join('&');
+
+      window.location.href = pricingCheckoutUrl;
+      return;
+    }
 
     // ---- Voucher validation ----
     var vResult = validateVoucher(voucherVal);
@@ -558,39 +611,77 @@
   // ===============================================================
   // PLAN SELECTOR (paid mode)
   // ===============================================================
-  function initPlanSelector() {
+     function initPlanSelector() {
+    var typeSection = $('voucher-type-section');
+    var typeSelect = $('voucher-type-select');
     var planSection = $('plan-section');
     var planSelect = $('plan-select');
-    if (!planSection || !planSelect) return;
+    if (!typeSection || !typeSelect || !planSection || !planSelect) return;
 
     // Paid plans only visible in backend mode with plans configured
-    if (CONFIG.mode !== 'backend' || !CONFIG.plans || CONFIG.plans.length === 0) {
+    if (CONFIG.mode !== 'backend' || !CONFIG.plans || (!CONFIG.plans.standard && !CONFIG.plans.premium)) {
       return;
     }
 
+    show(typeSection);
     show(planSection);
 
-    // Populate options
-    CONFIG.plans.forEach(function (plan) {
+    // Populate the type selector with standard plans
+    populateTypeSelect('standard');
+
+    // When type changes, repopulate plan options
+    typeSelect.addEventListener('change', function () {
+      var selectedType = typeSelect.value.startsWith('premium') ? 'premium' : 'standard';
+      populateTypeSelect(selectedType);
+      var submitLabel = $('submit-label');
+      if (submitLabel) {
+        submitLabel.textContent = (planSelect.value && typeSelect.value) ? 'Pay & Connect' : 'Connect Now';
+      }
+    });
+
+    // When plan changes, update submit button label
+    planSelect.addEventListener('change', function () {
+      var submitLabel = $('submit-label');
+      if (submitLabel) {
+        submitLabel.textContent = (planSelect.value && typeSelect.value) ? 'Pay & Connect' : 'Connect Now';
+      }
+    });
+  }
+
+  function populateTypeSelect(type) {
+    var planSelect = $('plan-select');
+    if (!planSelect) return;
+
+    // Clear existing options
+    planSelect.innerHTML = '<option value="">— Choose a plan —</option>';
+
+    var plans = (CONFIG.plans[type] || []).slice();
+    plans.forEach(function (plan) {
       var opt = document.createElement('option');
       opt.value = plan.duration; // minutes
       opt.textContent = plan.label + ' — ' + formatPrice(plan.price);
       planSelect.appendChild(opt);
     });
+  }
 
-    // When plan selected, change submit button label
-    planSelect.addEventListener('change', function () {
-      var submitLabel = $('submit-label');
-      if (submitLabel) {
-        submitLabel.textContent = planSelect.value ? 'Pay & Connect' : 'Connect Now';
-      }
-    });
+  // Return the selected voucherType prefix (standard or premium)
+  function getSelectedVoucherType() {
+    var typeSelect = $('voucher-type-select');
+    var planSelect = $('plan-select');
+    if (!typeSelect || !planSelect) return null;
+    if (!typeSelect.value || !planSelect.value) return null;
+
+    // The typeSelect value is like "standard-1h" or "premium-5h"
+    var parts = typeSelect.value.split('-');
+    var tier = parts[0]; // "standard" or "premium"
+    var planId = typeSelect.value; // full ID like "premium-5h"
+    return { tier: tier, planId: planId };
   }
 
   // ===============================================================
   // PAYMENT TILES (backend/paid mode)
   // ===============================================================
-  function initPaymentTiles() {
+    function initPaymentTiles() {
     var tiles = document.querySelectorAll('.payment-tile');
     if (!tiles.length) return;
 
@@ -603,26 +694,165 @@
         tile.classList.add('is-selected');
 
         var method = tile.getAttribute('data-payment');
+        var typeSelect = $('voucher-type-select');
         var planSelect = $('plan-select');
-        var planSection = $('plan-section');
 
-        // If a plan is selected, redirect to the appropriate checkout flow
-        if (planSelect && planSelect.value) {
-          var plan = CONFIG.plans && CONFIG.plans.find(function (p) {
-            return String(p.duration) === planSelect.value;
+        var selectedType = getSelectedVoucherType();
+
+        // If a plan is selected, redirect to the payment checkout flow
+        if (planSelect && planSelect.value && selectedType && selectedType.tier) {
+          var checkoutUrl = (CONFIG.apiBaseUrl || '') + '/api/payment/initiate?' + [
+            'method=' + encodeURIComponent(method),
+            'voucherType=' + encodeURIComponent(selectedType.tier),
+            'planId=' + encodeURIComponent(selectedType.planId),
+            'plan=' + encodeURIComponent(planSelect.value),
+            'clientMac=' + encodeURIComponent(queryParams.clientMac || ''),
+          ].join('&');
+
+          window.location.href = checkoutUrl;
+        }
+      });
+    });
+  }
+
+    // ===============================================================
+  // PRICING TABLE SELECT HANDLER
+  // ===============================================================
+  function initPricingTable() {
+    var selectButtons = document.querySelectorAll('.btn--select');
+    if (!selectButtons.length) return;
+
+        selectButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var row = btn.closest('tr');
+        if (!row) return;
+
+        var tier = row.getAttribute('data-tier');
+        var duration = parseInt(row.getAttribute('data-duration'), 10);
+        var price = parseInt(row.getAttribute('data-price'), 10);
+        var planId = row.getAttribute('data-id');
+
+        // Hide the voucher form, show payment section
+        var voucherSection = $('voucher-input') ? $('voucher-input').closest('.form-group') : null;
+        var paymentSection = document.querySelector('.payment-section');
+        var formError = $('form-error');
+
+        // Store selected plan in hidden field on the form
+        var form = document.querySelector('form.auth-form');
+        if (form) {
+          // Remove any existing selectedPlan hidden input to avoid duplicates
+          var existingInput = form.querySelector('input[name="selectedPlan"]');
+          if (existingInput) {
+            form.removeChild(existingInput);
+          }
+          // Store selected plan details
+          var hiddenInput = document.createElement('input');
+          hiddenInput.type = 'hidden';
+          hiddenInput.name = 'selectedPlan';
+          hiddenInput.value = JSON.stringify({
+            tier: tier,
+            duration: duration,
+            price: price,
+            planId: planId
           });
+          form.appendChild(hiddenInput);
+        }
 
-          if (plan) {
-            // Redirect to payment endpoint for the selected method
-            var checkoutUrl = (CONFIG.apiBaseUrl || '') + '/api/payment/initiate?' + [
-              'method=' + encodeURIComponent(method),
-              'plan=' + encodeURIComponent(planSelect.value),
-              'clientMac=' + encodeURIComponent(queryParams.clientMac || ''),
-            ].join('&');
+        // Hide voucher input if present
+        if (voucherSection) {
+          voucherSection.classList.add('hidden');
+        }
 
-            window.location.href = checkoutUrl;
+        // Clear any form errors
+        setFormError('');
+        setBanner('');
+
+                // Show payment tiles section
+        if (paymentSection) {
+          paymentSection.classList.add('payment-section--visible');
+        }
+
+        // Update submit button label
+        var submitLabel = $('submit-label');
+        if (submitLabel) {
+          submitLabel.textContent = 'Pay & Connect';
+        }
+
+        // Highlight the selected row (deselect across ALL pricing tables, not just same table)
+        var allTables = document.querySelectorAll('.pricing-table');
+        var allRows = [];
+        allTables.forEach(function (table) {
+          var rows = table.querySelectorAll('tbody tr');
+          rows.forEach(function (r) { allRows.push(r); });
+        });
+        allRows.forEach(function (r) {
+          r.classList.remove('is-selected');
+        });
+        row.classList.add('is-selected');
+
+        // Show status banner
+        var durMin = duration;
+        var durText = '';
+        if (duration >= 1440) {
+          durText = (duration / 1440) + ' day' + (duration / 1440 >= 2 ? 's' : '');
+        } else if (duration >= 60) {
+          durText = (duration / 60) + ' hour' + (duration / 60 >= 2 ? 's' : '');
+        } else {
+          durText = duration + ' minute' + (duration >= 2 ? 's' : '');
+        }
+
+        setBanner('Selected: ' + tier.charAt(0).toUpperCase() + tier.slice(1) + ' - ' + durText + ' plan. Choose a payment method.', 'info');
+      });
+    });
+
+    // Add handlers for clear/reset buttons
+    var clearButtons = document.querySelectorAll('.btn--clear');
+    clearButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        // Find the parent row and remove highlight
+        var row = btn.closest('tr');
+        if (row) {
+          row.classList.remove('is-selected');
+        }
+
+        // Remove all row highlights across the table
+        var allTables = document.querySelectorAll('.pricing-table');
+        allTables.forEach(function (table) {
+          var rows = table.querySelectorAll('tbody tr');
+          rows.forEach(function (r) {
+            r.classList.remove('is-selected');
+          });
+        });
+
+        // Remove the selectedPlan hidden input
+        var form = document.querySelector('form.auth-form');
+        if (form) {
+          var hiddenInput = form.querySelector('input[name="selectedPlan"]');
+          if (hiddenInput) {
+            form.removeChild(hiddenInput);
           }
         }
+
+        // Re-enable the voucher section
+        var voucherSection = $('voucher-input') ? $('voucher-input').closest('.form-group') : null;
+        if (voucherSection) {
+          voucherSection.classList.remove('hidden');
+        }
+
+                // Hide payment section
+        var paymentSection = document.querySelector('.payment-section');
+        if (paymentSection) {
+          paymentSection.classList.remove('payment-section--visible');
+        }
+
+        // Reset submit button label
+        var submitLabel = $('submit-label');
+        if (submitLabel) {
+          submitLabel.textContent = 'Connect Now';
+        }
+
+        setBanner('');
+        setFormError('');
       });
     });
   }
@@ -642,6 +872,9 @@
 
     // Set up plan selector (paid mode)
     initPlanSelector();
+
+    // Set up pricing table select buttons
+    initPricingTable();
 
     // Set up payment tile interactions
     initPaymentTiles();
@@ -676,13 +909,14 @@
   // ===============================================================
   // EXPORTS — for testing / status page
   // ===============================================================
-  window.Portal = {
+    window.Portal = {
     parseQueryParams: parseQueryParams,
     validateVoucher:  validateVoucher,
     isAllowedRedirect: isAllowedRedirect,
     normalizeMac:     normalizeMac,
     getQueryParams:   function () { return queryParams; },
     getRedirectDestination: getRedirectDestination,
+    getSelectedVoucherType: getSelectedVoucherType,
     config: CONFIG,
   };
 

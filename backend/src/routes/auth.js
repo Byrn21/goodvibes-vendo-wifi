@@ -18,7 +18,7 @@ const { v4: uuidv4 } = require('uuid');
 // POST /api/auth
 router.post('/', async (req, res, next) => {
   try {
-    const {
+        const {
       voucher,
       clientMac,
       clientIp,
@@ -26,6 +26,7 @@ router.post('/', async (req, res, next) => {
       ssidName,
       redirectUrl,
       termsAccepted,
+      voucherType,
     } = req.body;
 
     // ── Input validation ────────────────────────────────────
@@ -67,6 +68,7 @@ router.post('/', async (req, res, next) => {
     }
 
     const duration = voucherResult.duration || 60; // minutes
+    const voucherTypeResolved = voucherResult.type || voucherType || 'standard';
 
     // ── Call Omada extPortal/auth ──────────────────────────
     let omadaResult;
@@ -76,7 +78,7 @@ router.post('/', async (req, res, next) => {
         clientIp: clientIp || '',
         apMac: apMac || '',
         ssidName: ssidName || '',
-        username: voucher.trim(),
+        username: voucherTypeResolved === 'premium' ? 'prem_' + voucher.trim() : voucher.trim(),
         password: voucher.trim(),
         sessionId,
       });
@@ -104,6 +106,7 @@ router.post('/', async (req, res, next) => {
       ssidName: ssidName || '',
       duration,        // minutes
       voucherUsed: voucher.trim(),
+      voucherType: voucherTypeResolved,
     });
 
     return res.json({
@@ -112,9 +115,10 @@ router.post('/', async (req, res, next) => {
       sessionId,
       redirectUrl: finalRedirectUrl,
       // Expose minimal session info (not secrets)
-      session: {
+            session: {
         state: 'active',
         remainingSeconds: duration * 60,
+        voucherType: voucherTypeResolved,
       },
     });
 
