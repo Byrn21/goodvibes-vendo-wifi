@@ -137,9 +137,9 @@ app.use((err, req, res, _next) => {
   const code = err.code || 'SERVER_ERROR';
   // Log full error server-side; return generic message to client
   console.error('[' + req.method + ' ' + req.path + ']', err.message, err.stack);
-  res.status(status).json({
+      res.status(status).json({
     success: false,
-    error: NODE_ENV === 'production' ? 'An internal error occurred.' : err.message,
+    error: err.message,
     code: code,
   });
 });
