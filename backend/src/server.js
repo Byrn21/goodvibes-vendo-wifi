@@ -63,7 +63,7 @@ const corsOptions = {
     if (/^http\/\/localhost/.test(origin)) return cb(null, true);
     cb(new Error('CORS: origin not allowed'));
   },
-    methods: ['GET', 'POST', 'OPTIONS'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
   credentials: true,
 };
