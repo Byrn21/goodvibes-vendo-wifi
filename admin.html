@@ -85,8 +85,8 @@
 
       function setApiKey() {
         var key = prompt('Enter your Admin API Key:');
-        if (key) {
-          API_KEY = key;
+        if (key && key.trim()) {
+          API_KEY = key.trim();
           els.apiStatus.textContent = 'API key set. Data will be loaded below.';
           els.apiStatus.className = '';
           loadStats();
@@ -264,3 +264,7 @@
   </script>
 </body>
 </html>
+
+
+
+
