@@ -93,85 +93,83 @@ async function fixMissingColumns() {
     const existing = await getExistingColumns(db, 'sessions');
     sessionsExists = true;
 
-    if (existing.length === 0) {
+        if (existing.length === 0) {
       // Table doesn't exist yet — CREATE TABLE will handle it
-      return;
-    }
+      console.log('[migrate_fix] Sessions table not found — CREATE TABLE will handle it.');
+    } else {
+      const missing = SESSIONS_COLUMNS.filter(c => !existing.includes(c.name));
 
-    const missing = SESSIONS_COLUMNS.filter(c => !existing.includes(c.name));
+      if (missing.length === 0) {
+        console.log('[migrate_fix] All sessions columns up to date.');
+      } else {
+        console.log(`[migrate_fix] Adding ${missing.length} missing column(s) to sessions table...`);
 
-    if (missing.length === 0) {
-      // console.log('[migrate_fix] All sessions columns up to date.');
-      return;
-    }
+        for (const col of missing) {
+          try {
+            // PostgreSQL: columnExists check handles IF NOT EXISTS
+            const exists = await columnExists(db, 'sessions', col.name);
+            if (exists) {
+              console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
+              continue;
+            }
 
-    console.log(`[migrate_fix] Adding ${missing.length} missing column(s) to sessions table...`);
-
-    for (const col of missing) {
-      try {
-        // PostgreSQL: columnExists check handles IF NOT EXISTS
-        const exists = await columnExists(db, 'sessions', col.name);
-        if (exists) {
-          console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
-          continue;
+            // SQLite: add column with default
+            await db.exec(`ALTER TABLE sessions ADD COLUMN ${col.name} ${col.type}`);
+            console.log(`[migrate_fix]   + ${col.name} (${col.type})`);
+          } catch (err) {
+            // PostgreSQL: duplicate column name — ignore
+            if (err.code === '42701' || (err.message && err.message.includes('already exists'))) {
+              console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
+              continue;
+            }
+            // Column might already exist — log and skip non-critical errors
+            console.warn(`[migrate_fix]   ! ${col.name}: ${err.message}`);
+          }
         }
-
-        // SQLite: add column with default
-        await db.exec(`ALTER TABLE sessions ADD COLUMN ${col.name} ${col.type}`);
-        console.log(`[migrate_fix]   + ${col.name} (${col.type})`);
-      } catch (err) {
-        // PostgreSQL: duplicate column name — ignore
-        if (err.code === '42701' || (err.message && err.message.includes('already exists'))) {
-          console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
-          continue;
-        }
-        // Column might already exist — log and skip non-critical errors
-        console.warn(`[migrate_fix]   ! ${col.name}: ${err.message}`);
+        console.log('[migrate_fix] Sessions table columns updated successfully.');
       }
     }
-
-        console.log('[migrate_fix] Sessions table columns updated successfully.');
   } catch (err) {
     if (!sessionsExists) {
       // Table doesn't exist — schema.sql CREATE TABLE will handle it
-      return;
+    } else {
+      console.error('[migrate_fix] Sessions migration error:', err.message);
     }
-    throw err;
   }
 
-  // --- Vouchers table ---
+    // --- Vouchers table ---
   try {
-    const existingV = await getExistingColumns(db, 'vouchers');
+    let existingV = await getExistingColumns(db, 'vouchers');
     if (existingV.length === 0) {
       // Vouchers table doesn't exist yet — CREATE TABLE will handle it
-      return;
-    }
+      console.log('[migrate_fix] Vouchers table not found — CREATE TABLE will handle it.');
+    } else {
+      const missingV = VOUCHERS_COLUMNS.filter(c => !existingV.includes(c.name));
+      if (missingV.length === 0) {
+        console.log('[migrate_fix] All vouchers columns up to date.');
+      } else {
+        console.log(`[migrate_fix] Adding ${missingV.length} missing column(s) to vouchers table...`);
 
-    const missingV = VOUCHERS_COLUMNS.filter(c => !existingV.includes(c.name));
-    if (missingV.length === 0) {
-      return;
-    }
-
-    console.log(`[migrate_fix] Adding ${missingV.length} missing column(s) to vouchers table...`);
-
-    for (const col of missingV) {
-      try {
-        const exists = await columnExists(db, 'vouchers', col.name);
-        if (exists) {
-          console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
-          continue;
+        for (const col of missingV) {
+          try {
+            const exists = await columnExists(db, 'vouchers', col.name);
+            if (exists) {
+              console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
+              continue;
+            }
+            await db.exec(`ALTER TABLE vouchers ADD COLUMN ${col.name} ${col.type}`);
+            console.log(`[migrate_fix]   + ${col.name} (${col.type})`);
+          } catch (err) {
+            if (err.code === '42701' || (err.message && err.message.includes('already exists'))) {
+              console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
+              continue;
+            }
+            console.warn(`[migrate_fix]   ! ${col.name}: ${err.message}`);
+          }
         }
-        await db.exec(`ALTER TABLE vouchers ADD COLUMN ${col.name} ${col.type}`);
-        console.log(`[migrate_fix]   + ${col.name} (${col.type})`);
-      } catch (err) {
-        if (err.code === '42701' || (err.message && err.message.includes('already exists'))) {
-          console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
-          continue;
-        }
-        console.warn(`[migrate_fix]   ! ${col.name}: ${err.message}`);
+        console.log('[migrate_fix] Vouchers table columns updated successfully.');
       }
     }
-    console.log('[migrate_fix] Vouchers table columns updated successfully.');
   } catch (err) {
     console.warn('[migrate_fix] Vouchers table migration skipped:', err.message);
   }
