@@ -78,10 +78,6 @@ OMADA_SITE=Default
 JWT_SECRET=<GENERATE_RANDOM_STRING_HERE>
 CORS_ORIGINS=https://your-frontend-url.pages.dev
 
-# --- Payment (if applicable) ---
-PAYMENT_PROVIDER=paymock
-PAYMONGO_SECRET_KEY=sk_test_your_paymongo_secret_key
-PAYMONGO_WEBHOOK_SECRET=whsec_your_paymongo_webhook_secret
 ```
 
 > **Note:** `DATABASE_URL` is automatically set by Render from your PostgreSQL add-on. `PG_SSL_REJECT_UNAUTHORIZED=false` is also pre-configured in `render.yaml` for Render's PostgreSQL TLS handling.

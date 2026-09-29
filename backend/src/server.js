@@ -20,9 +20,9 @@ const { rateLimit } = require('express-rate-limit');
 const path = require('path');
 const authRoutes = require('./routes/auth');
 const sessionRoutes = require('./routes/session');
-const paymentRoutes = require('./routes/payment');
 const adminRoutes = require('./routes/admin');
 const { startExpirationWorker } = require('./services/session');
+const { fixMissingColumns } = require('./db/migrate_fix');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -86,9 +86,6 @@ app.use('/api/auth',     authRoutes);
 app.use('/api/session',  sessionRoutes);
 app.use('/api/admin',    adminRoutes);
 
-// Payment routes — webhook uses raw body for signature verification
-app.use('/api/payment', paymentRoutes);
-
 // Health check (unauthenticated)
 app.get('/health', (req, res) => {
   res.json({ ok: true, timestamp: new Date().toISOString(), env: NODE_ENV });
@@ -142,16 +139,27 @@ app.use((err, req, res, _next) => {
 });
 
 // ── Start ────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`Omada portal backend running on port ${PORT} [${NODE_ENV}]`);
-
-  // Start session expiration worker (calls Omada unauth when sessions expire)
-  if (process.env.OMADA_BASE_URL) {
-    startExpirationWorker();
-  } else if (NODE_ENV !== 'test') {
-    console.warn('[WARN] OMADA_BASE_URL not set — session expiration worker is disabled.');
-    console.warn('[WARN] In production, set OMADA_BASE_URL to enable automatic session expiry.');
+const startup = async () => {
+  // Ensure all schema columns exist on existing production tables
+  try {
+    await fixMissingColumns();
+  } catch (err) {
+    console.error('[startup] Column migration failed:', err.message);
   }
-});
+
+  app.listen(PORT, () => {
+    console.log(`Omada portal backend running on port ${PORT} [${NODE_ENV}]`);
+
+    // Start session expiration worker (calls Omada unauth when sessions expire)
+    if (process.env.OMADA_BASE_URL) {
+      startExpirationWorker();
+    } else if (NODE_ENV !== 'test') {
+      console.warn('[WARN] OMADA_BASE_URL not set — session expiration worker is disabled.');
+      console.warn('[WARN] In production, set OMADA_BASE_URL to enable automatic session expiry.');
+    }
+  });
+};
+
+startup();
 
 module.exports = app;

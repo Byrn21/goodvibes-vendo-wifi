@@ -34,6 +34,12 @@ services:
       - key: DEFAULT_REDIRECT_URL
         value: https://www.google.com
       # Secrets — set these in the Render dashboard
+      # ADMIN_API_KEY
+      # ADMIN_USERNAME
+      # ADMIN_PASSWORD
+      # PRICE_PER_HOUR
+      # PREMIUM_PRICE_MODIFIER
+      # PREMIUM_PAUSE_VALIDITY_HOURS
       # BASE_URL (your Render service URL)
       # FRONTEND_ORIGIN (your frontend URL)
       # OMADA_BASE_URL

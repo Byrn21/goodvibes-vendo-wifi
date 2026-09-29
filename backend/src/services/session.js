@@ -333,12 +333,26 @@ function startExpirationWorker() {
       await expireSession(row.session_id, 'time_expired');
     }
 
-    // Also expire premium sessions paused beyond the validity window
+        // Also expire premium sessions paused beyond the validity window
     const maxPausedAt = new Date(Date.now() - PREMIUM_PAUSE_VALIDITY_HOURS * 60 * 60 * 1000).toISOString();
-    const stalePaused = await db.query(`
+    let stalePaused = [];
+    try {
+      stalePaused = await db.query(`
       SELECT session_id FROM sessions
       WHERE state = 'paused' AND voucher_type = 'premium' AND paused_at IS NOT NULL AND paused_at <= ?
     `, [maxPausedAt]);
+    } catch (err) {
+      // voucher_type column may not exist in older databases — fall back to query without it
+      if (err.code === '42701' || err.message && err.message.includes('voucher_type')) {
+        console.warn('[expiration-worker] voucher_type column not found, using fallback query');
+        stalePaused = await db.query(`
+        SELECT session_id FROM sessions
+        WHERE state = 'paused' AND paused_at IS NOT NULL AND paused_at <= ?
+      `, [maxPausedAt]);
+      } else {
+        throw err;
+      }
+    }
 
     for (const row of stalePaused) {
       await expireSession(row.session_id, 'pause_expired');

@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS webhook_events (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id     VARCHAR(128) NOT NULL UNIQUE,
     session_id   VARCHAR(32),
-    provider     VARCHAR(16) DEFAULT 'paymongo',
+        provider     VARCHAR(16),
     event_type   VARCHAR(64),
     amount       INTEGER,
     status       VARCHAR(16),

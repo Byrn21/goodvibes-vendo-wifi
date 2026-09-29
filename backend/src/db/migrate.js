@@ -9,6 +9,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { getDb, closeDb } = require('./client');
+const { fixMissingColumns } = require('./migrate_fix');
 
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
@@ -20,6 +21,9 @@ async function migrate() {
   const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
 
   await db.exec(schema);
+
+  // Add any missing columns to existing tables (idempotent)
+  await fixMissingColumns();
 
   console.log('[migrate] Schema applied successfully.');
   console.log('[migrate] Done.');

@@ -788,7 +788,106 @@
 
    // ==============================================================================
    // CASH PAYMENT TIMER MODAL
-   // ==============================================================================
+   /**
+  
+   * showConnectionInstructions — Show a popup with WiFi connection instructions.
+  
+   * Triggered when the user is redirected to the voucher page after
+  
+   * selecting "I already have a voucher" from the cash payment timer.
+  
+   */
+  
+  function showConnectionInstructions() {
+  
+    var modal = $('connection-instructions-modal');
+  
+    var closeBtn = $('connection-instructions-close');
+  
+    var gotItBtn = $('connection-instructions-got-it');
+  
+  
+  
+    if (!modal) return;
+  
+  
+  
+    // Check if the flag is set
+  
+    var shouldShow = sessionStorage.getItem('showConnectionInstructions');
+  
+    if (shouldShow !== 'true') return;
+  
+  
+  
+    // Remove flag
+  
+    sessionStorage.removeItem('showConnectionInstructions');
+  
+  
+  
+    // Show modal
+  
+    show(modal);
+  
+    modal.focus();
+  
+  
+  
+    // Focus the Got It button
+  
+    if (gotItBtn) setTimeout(function () { gotItBtn.focus(); }, 100);
+  
+  
+  
+    // Close handlers
+  
+    function closeConnectionModal() {
+  
+      hide(modal);
+  
+    }
+  
+  
+  
+    if (closeBtn) closeBtn.onclick = closeConnectionModal;
+  
+    if (gotItBtn) gotItBtn.onclick = closeConnectionModal;
+  
+  
+  
+    // Close on overlay click
+  
+    modal.onclick = function (e) {
+  
+      if (e.target === modal) closeConnectionModal();
+  
+    };
+  
+  
+  
+    // Close on Escape key
+  
+    function onEsc(e) {
+  
+      if (e.key === 'Escape') {
+  
+        closeConnectionModal();
+  
+        document.removeEventListener('keydown', onEsc);
+  
+      }
+  
+    }
+  
+    document.addEventListener('keydown', onEsc);
+  
+  }
+  
+  
+  
+  
+  // ==============================================================================
    function showCashTimerModal() {
      var modal = $('cash-modal');
      var closeBtn = $('cash-modal-close');
@@ -829,6 +928,7 @@
          if (remaining <= 0) {
            clearInterval(countdownInterval);
            // Timer expired - redirect to voucher input page
+           sessionStorage.setItem('showConnectionInstructions', 'true');
            var redirectUrl = (window.CONFIG && window.CONFIG.cashPayment && window.CONFIG.cashPayment.redirectUrl) || 'index.html';
            window.location.href = redirectUrl;
          }
@@ -862,6 +962,8 @@
      // "I already have a voucher" handler
      function redirectToVoucher() {
        stopCountdown();
+       // Set flag to show connection instructions on next page load
+       sessionStorage.setItem('showConnectionInstructions', 'true');
        var redirectUrl = (window.CONFIG && window.CONFIG.cashPayment && window.CONFIG.cashPayment.redirectUrl) || 'index.html';
        window.location.href = redirectUrl;
      }
@@ -1086,27 +1188,15 @@
     if (CONFIG.mockMode) {
       setBanner('Mock mode enabled — authentication is simulated.', 'info');
     }
+
+        // Show connection instructions if redirected from cash payment flow
+    showConnectionInstructions();
   }
 
-  // Run when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-
-  // ===============================================================
-  // EXPORTS — for testing / status page
-  // ===============================================================
-    window.Portal = {
-    parseQueryParams: parseQueryParams,
-    validateVoucher:  validateVoucher,
-    isAllowedRedirect: isAllowedRedirect,
-    normalizeMac:     normalizeMac,
-    getQueryParams:   function () { return queryParams; },
-    getRedirectDestination: getRedirectDestination,
-    getSelectedVoucherType: getSelectedVoucherType,
-    config: CONFIG,
-  };
+  // ── Start ───────────────────────────────────────────────────
+  init();
 
 })();
+
+
+  
