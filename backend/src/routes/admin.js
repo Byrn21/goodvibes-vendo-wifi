@@ -206,6 +206,112 @@ router.post('/sessions/:id/expire', async (req, res, next) => {
   }
 });
 
+// Import vouchers from CSV/XLSX file
+const multer = require('multer');
+const XLSX = require('xlsx');
+
+// Memory storage only — files are never written to disk
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+});
+
+router.post('/vouchers/import', upload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+
+    // Parse the file
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) {
+      return res.status(400).json({ success: false, error: 'Invalid file: no sheets found' });
+    }
+
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(worksheet);
+
+    if (rows.length === 0) {
+      return res.status(400).json({ success: false, error: 'File contains no data rows' });
+    }
+
+    // Validate required columns
+    const requiredColumns = ['ID', 'Code', 'Type', 'Duration', 'Price'];
+    const headers = Object.keys(rows[0]);
+    const missingColumns = requiredColumns.filter(col => !headers.includes(col));
+
+    if (missingColumns.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Missing required columns: ${missingColumns.join(', ')}`,
+      });
+    }
+
+    // Validate Code format (6-digit numeric)
+    const invalidCodes = [];
+    rows.forEach((row, index) => {
+      const codeStr = String(row.Code || '').trim();
+      if (!/^\d{6}$/.test(codeStr)) {
+        invalidCodes.push(`Row ${index + 1}: "${codeStr}"`);
+      }
+    });
+
+    if (invalidCodes.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid code format (must be 6-digit numeric). Invalid: ${invalidCodes.join('; ')}`,
+      });
+    }
+
+    // Insert vouchers into database
+    const db = getDb();
+    let inserted = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const row of rows) {
+      const code = String(row.Code).trim();
+      const type = String(row.Type).trim().toLowerCase();
+      const duration = parseInt(row.Duration) || 60;
+      const price = row.Price ? parseInt(row.Price) : null;
+
+      // Validate type
+      if (type !== 'standard' && type !== 'premium') {
+        skipped++;
+        continue;
+      }
+
+      // Check if voucher already exists
+      const existing = await db.getOne('SELECT id FROM vouchers WHERE code = ?', [code]);
+
+      if (existing) {
+        // Update existing voucher
+        await db.run(
+          'UPDATE vouchers SET type = ?, duration_minutes = ?, price = ? WHERE code = ?',
+          [type, duration, price, code]
+        );
+        updated++;
+      } else {
+        // Insert new voucher
+        await db.run(
+          'INSERT INTO vouchers (code, type, duration_minutes, price, state) VALUES (?, ?, ?, ?, ?)',
+          [code, type, duration, price, 'active']
+        );
+        inserted++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Imported ${inserted} new, updated ${updated}, skipped ${skipped} voucher(s)`,
+      summary: { inserted, updated, skipped, total: rows.length },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Dashboard statistics
 router.get('/stats', async (req, res, next) => {
   try {

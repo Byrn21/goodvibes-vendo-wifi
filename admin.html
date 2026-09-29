@@ -44,17 +44,20 @@
       <p class="muted" id="api-status">Enter your API key to begin.</p>
       <button id="set-key-btn" class="btn btn--outline">Set API Key</button>
     </div>
-    <div class="admin-card">
+          <div class="admin-card">
       <div class="tab-bar">
         <button class="tab-btn active" data-tab="vouchers">Vouchers</button>
         <button class="tab-btn" data-tab="sessions">Sessions</button>
-        <button class="tab-btn" data-tab="create">Create Voucher</button>
+        <button class="tab-btn" data-tab="import">Import Vouchers</button>
+        <button class="tab-btn" data-tab="stats">Statistics</button>
       </div>
       <div id="tab-vouchers" class="tab-content active"></div>
       <div id="tab-sessions" class="tab-content"></div>
-      <div id="tab-create" class="tab-content"></div>
+      <div id="tab-import" class="tab-content"></div>
+      <div id="tab-stats" class="tab-content"></div>
     </div>
   </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="config/config.js"></script>
   <script>
     (function () {
@@ -63,13 +66,14 @@
       var API_BASE = (window.CONFIG && window.CONFIG.apiBaseUrl) || '';
       var API_KEY = '';
 
-      var els = {
+            var els = {
         statsGrid:  document.getElementById('stats-grid'),
         apiStatus:  document.getElementById('api-status'),
         setKeyBtn:  document.getElementById('set-key-btn'),
         tabVouchers: document.getElementById('tab-vouchers'),
         tabSessions: document.getElementById('tab-sessions'),
-        tabCreate:   document.getElementById('tab-create'),
+        tabImport:   document.getElementById('tab-import'),
+        tabStats:    document.getElementById('tab-stats'),
         tabs: document.querySelectorAll('.tab-btn'),
       };
 
@@ -141,7 +145,7 @@
                   '<td><span class="badge badge-' + (item.type || 'standard') + '">' + (item.type || 'standard') + '</span></td>' +
                   '<td>' + (item.duration_minutes || 0) + ' min</td>' +
                   '<td>' + (item.price ? formatPrice(item.price) : '—') + '</td>' +
-                  '<td><span class="badge badge-' + (item.state || 'active') + '">' + (item.state || 'active') + '</span></td>' +
+                  '<td><span class="badge badge-' + (item.used_at ? 'used' : (item.state || 'active')) + '">' + (item.used_at ? 'Used' : (item.state || 'active')) + '</span></td>' +
                   '<td><button onclick="deleteVoucher(' + (item.id || 0) + ')">Delete</button></td></tr>';
               }).join('') + '</tbody></table>';
           })
@@ -175,49 +179,90 @@
           });
       }
 
-      function renderCreateForm() {
-        els.tabCreate.innerHTML =
-          '<form id="create-form">' +
+      function renderImportForm() {
+        els.tabImport.innerHTML =
+          '<h3>Import Vouchers from CSV/XLSX</h3>' +
+          '<p class="muted">Required columns: ID, Code, Type, Duration, Price. Code must be 6-digit numeric.</p>' +
+          '<form id="import-form">' +
           '<div class="form-row">' +
-          '<div><label>Type</label><select id="create-type" style="width:100%">' +
-          '<option value="standard">Standard</option>' +
-          '<option value="premium">Premium</option>' +
-          '</select></div>' +
-          '<div><label>Duration (min)</label><input id="create-duration" type="number" value="60" min="1" style="width:100%"></div>' +
-          '<div><label>Quantity</label><input id="create-quantity" type="number" value="1" min="1" max="100" style="width:100%"></div>' +
-          '<div><label>Price (centavos)</label><input id="create-price" type="number" value="" placeholder="optional" style="width:100%"></div>' +
-          '<div style="align-self:flex-end"><button type="submit" class="btn btn--primary">Create Voucher(s)</button></div>' +
-          '</div></form><div id="create-result"></div>';
+          '<div style="flex:1; min-width:200px"><label for="import-file">File</label><input type="file" id="import-file" accept=".csv,.xlsx,.xls" style="width:100%"></div>' +
+          '<div style="align-self:flex-end"><button type="submit" class="btn btn--primary">Import Vouchers</button></div>' +
+          '</div></form><div id="import-result"></div>';
 
-        var form = document.getElementById('create-form');
+        var form = document.getElementById('import-form');
         if (form) {
           form.addEventListener('submit', function (e) {
             e.preventDefault();
-            var type = document.getElementById('create-type').value;
-            var duration = parseInt(document.getElementById('create-duration').value, 10);
-            var quantity = parseInt(document.getElementById('create-quantity').value, 10);
-            var price = document.getElementById('create-price').value || null;
-            api('/api/admin/vouchers', {
+            var fileInput = document.getElementById('import-file');
+            if (!fileInput.files || !fileInput.files[0]) {
+              document.getElementById('import-result').innerHTML = '<p class="error-msg">No file selected</p>';
+              return;
+            }
+            var file = fileInput.files[0];
+            var formData = new FormData();
+            formData.append('file', file);
+            api('/api/admin/vouchers/import', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: type, durationMinutes: duration, quantity: quantity, price: price ? parseInt(price, 10) : null })
+              body: formData
             }).then(function (res) {
-              var result = document.getElementById('create-result');
+              var result = document.getElementById('import-result');
               if (res.ok) {
-                result.innerHTML = '<p class="success-msg">Created ' + res.data.created.length + ' voucher(s): ' + res.data.created.join(', ') + '</p>';
+                result.innerHTML = '<p class="success-msg">' + res.data.message + '</p>';
                 loadVouchers();
               } else {
-                result.innerHTML = '<p class="error-msg">' + (res.data.error || 'Failed to create') + '</p>';
+                result.innerHTML = '<p class="error-msg">' + (res.data.error || 'Import failed') + '</p>';
               }
             }).catch(function (err) {
-              document.getElementById('create-result').innerHTML = '<p class="error-msg">' + err.message + '</p>';
+              document.getElementById('import-result').innerHTML = '<p class="error-msg">' + err.message + '</p>';
             });
           });
         }
       }
 
+      function loadStatsChart() {
+        els.tabStats.innerHTML = '<p class="muted">Loading statistics…</p>';
+        api('/api/admin/stats')
+          .then(function (res) {
+            if (!res.ok) throw new Error(res.data.error || 'API error');
+            var s = res.data.stats;
+            els.tabStats.innerHTML =
+              '<h3>Voucher Status Breakdown</h3>' +
+              '<canvas id="stats-chart" width="400" height="200" style="max-width:100%"></canvas>' +
+              '<div class="admin-grid" style="margin-top:16px">' +
+              stat('Total Vouchers', s.totalVouchers) +
+              stat('Active', s.activeVouchers) +
+              stat('Used', s.usedVouchers) +
+              stat('Sessions', s.totalSessions) +
+              stat('Active Sessions', s.activeSessions) +
+              stat('Paused', s.pausedSessions) +
+              stat('Premium Sessions', s.premiumSessions) +
+              stat('Total Revenue', s.totalRevenue) +
+              '</div>';
+
+            var ctx = document.getElementById('stats-chart').getContext('2d');
+            new Chart(ctx, {
+              type: 'pie',
+              data: {
+                labels: ['Active Vouchers', 'Used Vouchers', 'Expired Vouchers'],
+                datasets: [{
+                  data: [s.activeVouchers, s.usedVouchers, Math.max(0, (s.totalVouchers - s.activeVouchers - s.usedVouchers))],
+                  backgroundColor: ['#2e7d32', '#9e9e9e', '#c62828'],
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { position: 'bottom' }
+                }
+              }
+            });
+          })
+          .catch(function (err) {
+            els.tabStats.innerHTML = '<p class="error-msg">Failed to load stats: ' + err.message + '</p>';
+          });
       window.deleteVoucher = function (id) {
-        if (!confirm('Delete this voucher?')) return;
+        if (!confirm('Are you sure you want to delete this voucher? This action cannot be undone.')) return;
         api('/api/admin/vouchers/' + id, { method: 'DELETE' })
           .then(function (res) {
             if (res.ok) loadVouchers(); else alert(res.data.error || 'Delete failed');
@@ -246,20 +291,21 @@
         try { return new Date(iso).toLocaleString(); } catch (e) { return iso || ''; }
       }
 
-      els.tabs.forEach(function (tab) {
+            els.tabs.forEach(function (tab) {
         tab.addEventListener('click', function () {
           els.tabs.forEach(function (t) { t.classList.remove('active'); });
           tab.classList.add('active');
-          [].forEach.call([els.tabVouchers, els.tabSessions, els.tabCreate], function (c) { c.classList.remove('active'); });
+          [].forEach.call([els.tabVouchers, els.tabSessions, els.tabImport, els.tabStats], function (c) { c.classList.remove('active'); });
           var target = document.getElementById('tab-' + tab.getAttribute('data-tab'));
           if (target) target.classList.add('active');
           if (tab.getAttribute('data-tab') === 'vouchers') loadVouchers();
           else if (tab.getAttribute('data-tab') === 'sessions') loadSessions();
-          else if (tab.getAttribute('data-tab') === 'create') renderCreateForm();
+          else if (tab.getAttribute('data-tab') === 'import') renderImportForm();
+          else if (tab.getAttribute('data-tab') === 'stats') loadStatsChart();
         });
       });
 
-      renderCreateForm();
+      renderImportForm();
     })();
   </script>
 </body>
