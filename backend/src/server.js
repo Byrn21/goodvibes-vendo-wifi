@@ -63,8 +63,8 @@ const corsOptions = {
     if (/^http\/\/localhost/.test(origin)) return cb(null, true);
     cb(new Error('CORS: origin not allowed'));
   },
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
   credentials: true,
 };
 app.use(cors(corsOptions));
@@ -80,6 +80,10 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests. Please wait.', code: 'RATE_LIMITED' },
+  // Disable X-Forwarded-For validation — Render's proxy header format triggers ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+  validate: {
+    xForwardedForHeader: false,
+  },
 });
 app.use('/api/', limiter);
 

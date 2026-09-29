@@ -26,6 +26,13 @@ const SESSIONS_COLUMNS = [
   { name: 'expired_at', type: 'TIMESTAMP', after: 'expire_reason' },
 ];
 
+// Columns that may be missing from older production databases
+// Derived from schema.sql — vouchers table
+const VOUCHERS_COLUMNS = [
+  { name: 'type', type: "VARCHAR(16) NOT NULL DEFAULT 'standard'", after: 'code' },
+  { name: 'expires_at', type: 'TIMESTAMP', after: 'used_at' },
+];
+
 /**
  * Check if a column exists in a given table.
  * @param {Object} db - Database connection
@@ -123,13 +130,50 @@ async function fixMissingColumns() {
       }
     }
 
-    console.log('[migrate_fix] Sessions table columns updated successfully.');
+        console.log('[migrate_fix] Sessions table columns updated successfully.');
   } catch (err) {
     if (!sessionsExists) {
       // Table doesn't exist — schema.sql CREATE TABLE will handle it
       return;
     }
     throw err;
+  }
+
+  // --- Vouchers table ---
+  try {
+    const existingV = await getExistingColumns(db, 'vouchers');
+    if (existingV.length === 0) {
+      // Vouchers table doesn't exist yet — CREATE TABLE will handle it
+      return;
+    }
+
+    const missingV = VOUCHERS_COLUMNS.filter(c => !existingV.includes(c.name));
+    if (missingV.length === 0) {
+      return;
+    }
+
+    console.log(`[migrate_fix] Adding ${missingV.length} missing column(s) to vouchers table...`);
+
+    for (const col of missingV) {
+      try {
+        const exists = await columnExists(db, 'vouchers', col.name);
+        if (exists) {
+          console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
+          continue;
+        }
+        await db.exec(`ALTER TABLE vouchers ADD COLUMN ${col.name} ${col.type}`);
+        console.log(`[migrate_fix]   + ${col.name} (${col.type})`);
+      } catch (err) {
+        if (err.code === '42701' || (err.message && err.message.includes('already exists'))) {
+          console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
+          continue;
+        }
+        console.warn(`[migrate_fix]   ! ${col.name}: ${err.message}`);
+      }
+    }
+    console.log('[migrate_fix] Vouchers table columns updated successfully.');
+  } catch (err) {
+    console.warn('[migrate_fix] Vouchers table migration skipped:', err.message);
   }
 }
 
