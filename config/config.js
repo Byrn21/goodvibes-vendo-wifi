@@ -35,7 +35,7 @@
     // Base URL of your backend server (no trailing slash)
     // Update this when you deploy to Render:
     // e.g. https://your-app-name.onrender.com
-    apiBaseUrl: 'https://your-app-name.onrender.com',
+    apiBaseUrl: 'https://omada-captive-portal.onrender.com',
 
     // ==============================================================
     // VOUCHER VALIDATION
