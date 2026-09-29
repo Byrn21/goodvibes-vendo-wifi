@@ -52,13 +52,15 @@ const corsOptions = {
   origin: (origin, cb) => {
     // Allow requests with no origin (mobile captive portals)
     if (!origin) return cb(null, true);
+    // Allow null origin (file:// protocol for admin.html)
+    if (origin === 'null') return cb(null, true);
     const allowed = (process.env.CORS_ORIGINS || FRONTEND_ORIGIN)
       .split(',')
       .map(s => s.trim())
       .filter(Boolean);
     if (allowed.includes(origin)) return cb(null, true);
-    // In dev, allow localhost
-    if (NODE_ENV === 'development' && /^http:\/\/localhost/.test(origin)) return cb(null, true);
+    // Allow localhost (for admin panel dev access)
+    if (/^http\/\/localhost/.test(origin)) return cb(null, true);
     cb(new Error('CORS: origin not allowed'));
   },
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -163,3 +165,7 @@ const startup = async () => {
 startup();
 
 module.exports = app;
+
+
+
+
