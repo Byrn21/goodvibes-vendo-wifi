@@ -90,7 +90,13 @@ app.use('/api/admin',    adminRoutes);
 
 // Health check (unauthenticated)
 app.get('/health', (req, res) => {
-  res.json({ ok: true, timestamp: new Date().toISOString(), env: NODE_ENV });
+  res.json({ 
+    ok: true, 
+    timestamp: new Date().toISOString(), 
+    env: NODE_ENV,
+    ADMIN_API_KEY_SET: !!process.env.ADMIN_API_KEY,
+    ADMIN_API_KEY_LENGTH: process.env.ADMIN_API_KEY ? process.env.ADMIN_API_KEY.length : 0
+  });
 });
 
 // ── Static file serving for captive portal pages ──────────────────
