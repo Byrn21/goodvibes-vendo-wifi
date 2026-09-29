@@ -28,14 +28,6 @@ const VALID_TOKENS = new Set();
 // Middleware: require bearer token or API key
 function requireAuth(req, res, next) {
   const provided = req.headers['authorization']?.replace(/^Bearer\s+/i, '') || req.headers['x-api-key'];
-  // Debug logging
-  console.log('[auth] ADMIN_API_KEY set:', !!ADMIN_API_KEY);
-  console.log('[auth] ADMIN_API_KEY length:', ADMIN_API_KEY ? ADMIN_API_KEY.length : 0);
-  console.log('[auth] PROVIDED length:', provided ? provided.length : 0);
-  console.log('[auth] PROVIDED match:', provided === ADMIN_API_KEY);
-  console.log('[auth] Authorization header:', req.headers['authorization'] ? '[present]' : '[absent]');
-  console.log('[auth] x-api-key header:', req.headers['x-api-key'] ? '[present]' : '[absent]');
-  console.log('[auth] x-api-key value preview:', req.headers['x-api-key'] ? req.headers['x-api-key'].substring(0, 4) + '...' : '[absent]');
   if (!provided) {
     return res.status(401).json({ success: false, error: 'Unauthorized — valid token or API key required.' });
   }
