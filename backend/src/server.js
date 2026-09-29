@@ -121,6 +121,7 @@ if (PORTAL_HTML_DIR) {
   app.get('/success', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'success.html')));
       app.get('/status', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'status.html')));
   app.get('/admin', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'admin.html')));
+  app.get('/login', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'login.html')));
   app.get('/error', (req, res) => res.sendFile(path.join(PORTAL_HTML_DIR, 'error.html')));
 } else {
   console.warn('[WARN] Portal HTML directory not found — static file serving disabled.');
