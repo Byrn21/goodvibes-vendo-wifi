@@ -94,12 +94,7 @@ app.use('/api/admin',    adminRoutes);
 
 // Health check (unauthenticated)
 app.get('/health', (req, res) => {
-  res.json({ 
-    ok: true, 
-    timestamp: new Date().toISOString(), 
-    env: NODE_ENV,
-    ADMIN_API_KEY_SET: !!process.env.ADMIN_API_KEY,
-  });
+  res.json({ ok: true, timestamp: new Date().toISOString(), env: NODE_ENV });
 });
 
 // ── Static file serving for captive portal pages ──────────────────
@@ -142,9 +137,9 @@ app.use((err, req, res, _next) => {
   const code = err.code || 'SERVER_ERROR';
   // Log full error server-side; return generic message to client
   console.error('[' + req.method + ' ' + req.path + ']', err.message, err.stack);
-          res.status(status).json({
+            res.status(status).json({
     success: false,
-    error: err.message,
+    error: NODE_ENV === 'production' ? 'An internal error occurred.' : err.message,
     code: code,
   });
 });

@@ -25,6 +25,8 @@ services:
         value: true
       - key: SESSION_ENFORCE_INTERVAL
         value: 60000
+      - key: CORS_ORIGINS
+        value: https://omada-captive-portal.onrender.com
       - key: RATE_LIMIT_WINDOW_MS
         value: 900000
       - key: RATE_LIMIT_MAX_REQUESTS
@@ -33,7 +35,7 @@ services:
         value: info
       - key: DEFAULT_REDIRECT_URL
         value: https://www.google.com
-      # Secrets â€” set these in the Render dashboard
+      # Secrets — set these in the Render dashboard
       # ADMIN_API_KEY
       # ADMIN_USERNAME
       # ADMIN_PASSWORD
@@ -46,7 +48,6 @@ services:
       # OMADA_API_TOKEN
       # OMADA_SITE
       # JWT_SECRET
-      # CORS_ORIGINS
       # OMADA_MOCK
       # OMADA_TLS_REJECT
       # ALLOWED_REDIRECT_DOMAINS

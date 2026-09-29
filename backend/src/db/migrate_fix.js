@@ -15,8 +15,17 @@ const { getDb, closeDb } = require('./client');
 // Columns that may be missing from older production databases
 // Derived from schema.sql — sessions table
 const SESSIONS_COLUMNS = [
+  { name: 'client_ip', type: 'VARCHAR(45)', after: 'client_mac' },
+  { name: 'ap_mac', type: 'VARCHAR(32)', after: 'client_ip' },
+  { name: 'ssid_name', type: 'VARCHAR(64)', after: 'ap_mac' },
   { name: 'voucher_type', type: "VARCHAR(16) DEFAULT 'standard'", after: 'duration_minutes' },
   { name: 'total_duration_seconds', type: 'INTEGER', after: 'voucher_type' },
+  { name: 'started_at', type: 'TIMESTAMP', after: 'total_duration_seconds' },
+  { name: 'expires_at', type: 'TIMESTAMP', after: 'started_at' },
+  { name: 'paused_at', type: 'TIMESTAMP', after: 'expires_at' },
+  { name: 'remaining_seconds', type: 'INTEGER', after: 'paused_at' },
+  { name: 'state', type: "VARCHAR(16) NOT NULL DEFAULT 'pending'", after: 'remaining_seconds' },
+  { name: 'voucher_used', type: 'VARCHAR(32)', after: 'state' },
   { name: 'provider_session_id', type: 'VARCHAR(128)', after: 'voucher_used' },
   { name: 'payment_event_id', type: 'VARCHAR(128)', after: 'provider_session_id' },
   { name: 'payment_amount', type: 'INTEGER', after: 'payment_event_id' },
@@ -24,13 +33,21 @@ const SESSIONS_COLUMNS = [
   { name: 'omada_auth_failed', type: 'BOOLEAN DEFAULT FALSE', after: 'payment_method' },
   { name: 'expire_reason', type: 'VARCHAR(32)', after: 'omada_auth_failed' },
   { name: 'expired_at', type: 'TIMESTAMP', after: 'expire_reason' },
+  { name: 'created_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP', after: 'expired_at' },
+  { name: 'updated_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP', after: 'created_at' },
 ];
 
 // Columns that may be missing from older production databases
 // Derived from schema.sql — vouchers table
 const VOUCHERS_COLUMNS = [
   { name: 'type', type: "VARCHAR(16) NOT NULL DEFAULT 'standard'", after: 'code' },
-  { name: 'expires_at', type: 'TIMESTAMP', after: 'used_at' },
+  { name: 'duration_minutes', type: 'INTEGER NOT NULL DEFAULT 60', after: 'type' },
+  { name: 'price', type: 'INTEGER', after: 'duration_minutes' },
+  { name: 'state', type: "VARCHAR(16) NOT NULL DEFAULT 'active'", after: 'price' },
+  { name: 'used_by_mac', type: 'VARCHAR(32)', after: 'state' },
+  { name: 'used_at', type: 'TIMESTAMP', after: 'used_by_mac' },
+  { name: 'created_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP', after: 'used_at' },
+  { name: 'expires_at', type: 'TIMESTAMP', after: 'created_at' },
 ];
 
 /**
