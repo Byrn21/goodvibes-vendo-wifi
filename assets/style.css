@@ -1766,23 +1766,56 @@ body {
   color: #fff;
 }
 
-/* Collapsed sidebar — icons only */
+/* Collapsed sidebar — icon-only mode (60px) */
 .admin-sidebar.collapsed {
   width: 60px;
 }
 
 .admin-sidebar.collapsed .admin-sidebar__logo {
-  font-size: 1.2rem;
   text-align: center;
   margin-bottom: 20px;
 }
 
-.admin-sidebar.collapsed .admin-sidebar__nav-link {
-  text-align: center;
-  padding: 10px 0;
+.admin-sidebar.collapsed .admin-sidebar__logo-text {
+  display: none;
 }
 
-.admin-sidebar.collapsed .admin-sidebar__nav-link span {
+.admin-sidebar.collapsed .admin-sidebar__logo-icon {
+  display: block;
+  margin: 0 auto;
+}
+
+.admin-sidebar.collapsed .admin-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.admin-sidebar.collapsed .admin-sidebar__nav-link {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  width: 100%;
+}
+
+.admin-sidebar.collapsed .admin-sidebar__nav-link-icon {
+  display: block;
+}
+
+.admin-sidebar.collapsed .admin-sidebar__nav-link-text {
+  display: none;
+}
+
+.admin-sidebar.collapsed .admin-sidebar__nav-link span:not(.admin-sidebar__nav-link-icon) {
+  display: none;
+}
+
+.admin-sidebar.collapsed .admin-sidebar__footer {
+  text-align: center;
+}
+
+.admin-sidebar.collapsed .admin-user__name,
+.admin-sidebar.collapsed .admin-user__label {
   display: none;
 }
 
@@ -2161,6 +2194,44 @@ table tbody tr:hover {
 .actions-end {
   display: flex;
   justify-content: flex-end;
+}
+
+/* Import form - mobile responsive layout */
+@media (max-width: 768px) {
+  .admin-card .form-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .admin-card .form-field {
+    width: 100% !important;
+    flex: 1;
+  }
+  
+  .admin-card .form-field.full-width,
+  .admin-card .form-field label,
+  .admin-card .actions-end {
+    width: 100%;
+  }
+  
+  .admin-card .actions-end {
+    justify-content: stretch;
+  }
+  
+  .admin-card .form-select {
+    max-width: 100% !important;
+    width: 100%;
+  }
+  
+  .admin-card h3 {
+    font-size: 1.3rem;
+    line-height: 1.3;
+  }
+  
+  .admin-card .muted {
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
 }
 
 /* Messages */
