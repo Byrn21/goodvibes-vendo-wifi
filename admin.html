@@ -6,56 +6,89 @@
   <title>Admin Panel — WiFi Portal</title>
   <link rel="stylesheet" href="assets/style.css">
   <style>
-    body { background: #f0f2f5; }
-    .admin-container { max-width: 1200px; margin: 0 auto; padding: 24px; }
-    .admin-card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    .admin-card h2 { margin: 0 0 16px 0; color: #1a1a1a; font-size: 20px; }
-    .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
-    .stat-card { background: #f8f9fa; border-radius: 8px; padding: 16px; text-align: center; }
-    .stat-card .stat-value { font-size: 28px; font-weight: 700; color: #2d6a4f; }
-    .stat-card .stat-label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
-    .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
-    .form-row > * { flex: 1; min-width: 150px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #e0e0e0; font-size: 14px; }
-    th { background: #f8f9fa; font-weight: 600; color: #333; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
-    .badge-standard { background: #e3f2fd; color: #1565c0; }
-    .badge-premium { background: #fff3e0; color: #e65100; }
-    .badge-active { background: #e8f5e9; color: #2e7d32; }
-    .badge-expired { background: #ffebee; color: #c62828; }
-    .badge-used { background: #fafafa; color: #616161; }
-    .hidden { display: none; }
-    .muted { color: #888; font-style: italic; }
-    .error-msg { color: #c62828; font-size: 13px; margin-top: 4px; }
-    .success-msg { color: #2e7d32; font-size: 13px; margin-top: 4px; }
-    .tab-bar { display: flex; gap: 0; margin-bottom: 0; }
-    .tab-bar button { flex: 1; padding: 12px 16px; border: none; background: #f0f2f5; cursor: pointer; font-weight: 500; }
-    .tab-bar button.active { background: #fff; border-bottom: 3px solid #2d6a4f; color: #2d6a4f; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
+    body { background: #f0f2f5; margin: 0; font-family: var(--font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif); }
   </style>
 </head>
 <body>
-  <div class="admin-container">
-    <div class="admin-card">
-      <h2>WiFi Portal — Admin Panel</h2>
-      <div class="admin-grid" id="stats-grid"></div>
-      <div id="dashboard-chart" style="margin-top:16px">
-        <h3 style="margin-bottom:8px">Voucher Status Breakdown</h3>
-        <canvas id="stats-chart" width="400" height="200" style="max-width:100%"></canvas>
+  <div class="admin-layout">
+    <!-- Collapsible Sidebar -->
+    <aside class="admin-sidebar" id="admin-sidebar">
+      <button class="admin-sidebar__toggle" id="sidebar-toggle" aria-label="Toggle navigation">
+        <span class="admin-sidebar__toggle-icon">&#9776;</span>
+      </button>
+      <div class="admin-sidebar__content">
+        <div class="admin-sidebar__logo">
+          <span class="admin-sidebar__logo-icon">&#128213;</span>
+          <span class="admin-sidebar__logo-text">Admin Panel</span>
+        </div>
+        <ul class="admin-sidebar__nav">
+          <li class="admin-sidebar__nav-item">
+            <button class="admin-sidebar__nav-link admin-sidebar__nav-link--active" data-page="dashboard">
+              <span class="admin-sidebar__nav-link-icon">&#128202;</span>
+              <span class="admin-sidebar__nav-link-text">Dashboard</span>
+            </button>
+          </li>
+          <li class="admin-sidebar__nav-item">
+            <button class="admin-sidebar__nav-link" data-page="vouchers">
+              <span class="admin-sidebar__nav-link-icon">&#127979;</span>
+              <span class="admin-sidebar__nav-link-text">Vouchers</span>
+            </button>
+          </li>
+          <li class="admin-sidebar__nav-item">
+            <button class="admin-sidebar__nav-link" data-page="sessions">
+              <span class="admin-sidebar__nav-link-icon">&#128468;</span>
+              <span class="admin-sidebar__nav-link-text">Sessions</span>
+            </button>
+          </li>
+          <li class="admin-sidebar__nav-item">
+            <button class="admin-sidebar__nav-link" data-page="import">
+              <span class="admin-sidebar__nav-link-icon">&#8695;</span>
+              <span class="admin-sidebar__nav-link-text">Import</span>
+            </button>
+          </li>
+          <li class="admin-sidebar__nav-item">
+            <button class="admin-sidebar__nav-link" data-page="logout">
+              <span class="admin-sidebar__nav-link-icon">&#8617;</span>
+              <span class="admin-sidebar__nav-link-text">Logout</span>
+            </button>
+          </li>
+        </ul>
       </div>
-    </div>
-    <div class="admin-card">
-      <div class="tab-bar">
-        <button class="tab-btn active" data-tab="vouchers">Vouchers</button>
-        <button class="tab-btn" data-tab="sessions">Sessions</button>
-        <button class="tab-btn" data-tab="import">Import Vouchers</button>
+    </aside>
+
+    <!-- Mobile overlay -->
+    <div class="admin-overlay" id="admin-overlay"></div>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+      <div class="page-title">WiFi Portal — Admin Panel</div>
+      <div class="admin-card">
+        <h2>Dashboard</h2>
+        <div class="admin-grid" id="stats-grid"></div>
+        <div id="dashboard-chart">
+          <h3 style="margin-bottom:8px">Voucher Status Breakdown</h3>
+          <canvas id="stats-chart" width="400" height="200" style="max-width:100%; height:200px"></canvas>
+        </div>
       </div>
-      <div id="tab-vouchers" class="tab-content active"></div>
-      <div id="tab-sessions" class="tab-content"></div>
-      <div id="tab-import" class="tab-content"></div>
-    </div>
+
+      <!-- Vouchers Section -->
+      <div class="admin-card content-section" id="section-vouchers">
+        <h2>Vouchers</h2>
+        <div id="tab-vouchers"></div>
+      </div>
+
+      <!-- Sessions Section -->
+      <div class="admin-card content-section" id="section-sessions">
+        <h2>Sessions</h2>
+        <div id="tab-sessions"></div>
+      </div>
+
+      <!-- Import Section -->
+      <div class="admin-card content-section" id="section-import">
+        <h2>Import Vouchers</h2>
+        <div id="tab-import"></div>
+      </div>
+    </main>
   </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="config/config.js"></script>
@@ -66,13 +99,83 @@
       var API_BASE = (window.CONFIG && window.CONFIG.apiBaseUrl) || '';
       var ADMIN_TOKEN = localStorage.getItem('adminToken') || '';
 
-      var els = {
-        statsGrid:    document.getElementById('stats-grid'),
+            var els = {
+        statsGrid:      document.getElementById('stats-grid'),
         dashboardChart: document.getElementById('dashboard-chart'),
-        tabVouchers:  document.getElementById('tab-vouchers'),
-        tabSessions:  document.getElementById('tab-sessions'),
-        tabImport:    document.getElementById('tab-import'),
+        tabVouchers:    document.getElementById('tab-vouchers'),
+        tabSessions:    document.getElementById('tab-sessions'),
+        tabImport:      document.getElementById('tab-import'),
+        sidebar:        document.getElementById('admin-sidebar'),
+        sidebarToggle:  document.getElementById('sidebar-toggle'),
+        overlay:        document.getElementById('admin-overlay'),
+        sectionVouchers: document.getElementById('section-vouchers'),
+        sectionSessions: document.getElementById('section-sessions'),
+        sectionImport:   document.getElementById('section-import'),
       };
+
+      var sidebarLinks = document.querySelectorAll('.admin-sidebar__nav-link');
+
+      function toggleSidebar(forceState) {
+        var isCollapsed = forceState !== undefined ? forceState : els.sidebar.classList.contains('collapsed');
+        if (isCollapsed) {
+          els.sidebar.classList.remove('collapsed');
+          els.sidebar.classList.remove('collapsed-mobile');
+          els.overlay.classList.add('hidden');
+        } else {
+          els.sidebar.classList.add('collapsed');
+          els.sidebar.classList.remove('collapsed-mobile');
+          els.overlay.classList.add('hidden');
+        }
+      }
+
+      function navigateTo(page) {
+        // Close sidebar on mobile after navigating
+        els.sidebar.classList.remove('collapsed-mobile');
+        els.overlay.classList.add('hidden');
+
+        // Update active nav link
+        sidebarLinks.forEach(function (link) {
+          link.classList.remove('admin-sidebar__nav-link--active');
+        });
+
+        var targetLink = document.querySelector('.admin-sidebar__nav-link[data-page="' + page + '"]');
+        if (targetLink) {
+          targetLink.classList.add('admin-sidebar__nav-link--active');
+        }
+
+        // Show/hide sections
+        var sections = [
+          { el: els.sectionVouchers, name: 'vouchers' },
+          { el: els.sectionSessions, name: 'sessions' },
+          { el: els.sectionImport, name: 'import' },
+        ];
+
+        sections.forEach(function (s) {
+          if (s.el) {
+            if (s.name === page) {
+              s.el.classList.add('active');
+            } else {
+              s.el.classList.remove('active');
+            }
+          }
+        });
+
+        // Load content for the selected page
+        if (page === 'vouchers') {
+          loadVouchers();
+        } else if (page === 'sessions') {
+          loadSessions();
+        } else if (page === 'import') {
+          renderImportForm();
+        } else if (page === 'logout') {
+          logout();
+        }
+      }
+
+      function logout() {
+        localStorage.removeItem('adminToken');
+        window.location.href = 'login.html';
+      }
 
       function api(path, opts) {
         opts = opts || {};
@@ -229,19 +332,48 @@
           });
       }
 
-      window.deleteVoucher = function (id) {
+            window.deleteVoucher = function (id) {
         if (!confirm('Are you sure you want to delete this voucher? This action cannot be undone.')) return;
+        var btn = event ? event.target : null;
+        if (btn) {
+          btn.classList.add('btn--danger--loading');
+          btn.textContent = 'Deleting…';
+          btn.disabled = true;
+        }
         api('/api/admin/vouchers/' + id, { method: 'DELETE' })
           .then(function (res) {
-            if (res.ok) loadVouchers(); else alert(res.data.error || 'Delete failed');
+            if (res.ok) {
+              loadVouchers();
+              loadDashboard();
+            } else {
+              alert(res.data.error || 'Delete failed');
+            }
+          })
+          .catch(function (err) {
+            alert('Delete failed: ' + err.message);
+          })
+          .finally(function () {
+            if (btn) {
+              btn.classList.remove('btn--danger--loading');
+              btn.textContent = 'Delete';
+              btn.disabled = false;
+            }
           });
       };
 
-      window.expireSession = function (sessionId) {
+            window.expireSession = function (sessionId) {
         if (!confirm('Expire this session?')) return;
         api('/api/admin/sessions/' + encodeURIComponent(sessionId) + '/expire', { method: 'POST' })
           .then(function (res) {
-            if (res.ok) loadSessions(); else alert(res.data.error || 'Expire failed');
+            if (res.ok) {
+              loadSessions();
+              loadDashboard();
+            } else {
+              alert(res.data.error || 'Expire failed');
+            }
+          })
+          .catch(function (err) {
+            alert('Expire failed: ' + err.message);
           });
       };
 
@@ -259,19 +391,30 @@
         try { return new Date(iso).toLocaleString(); } catch (e) { return iso || ''; }
       }
 
-      document.querySelectorAll(".tab-btn").forEach(function (tab) {
-        tab.addEventListener('click', function () {
-          document.querySelectorAll('.tab-btn').forEach(function (t) { t.classList.remove('active'); });
-          tab.classList.add('active');
-          [].forEach.call([els.tabVouchers, els.tabSessions, els.tabImport], function (c) { c.classList.remove('active'); });
-          var target = document.getElementById('tab-' + tab.getAttribute('data-tab'));
-          if (target) target.classList.add('active');
-          if (tab.getAttribute('data-tab') === 'vouchers') loadVouchers();
-          else if (tab.getAttribute('data-tab') === 'sessions') loadSessions();
-          else if (tab.getAttribute('data-tab') === 'import') renderImportForm();
+            // Sidebar navigation handlers
+      sidebarLinks.forEach(function (navLink) {
+        navLink.addEventListener('click', function () {
+          var page = navLink.getAttribute('data-page');
+          if (page === 'logout') {
+            logout();
+            return;
+          }
+          navigateTo(page);
         });
       });
 
+      // Hamburger toggle button handler
+      els.sidebarToggle.addEventListener('click', function () {
+        toggleSidebar();
+      });
+
+      // Overlay click closes sidebar (mobile)
+      els.overlay.addEventListener('click', function () {
+        els.sidebar.classList.remove('collapsed-mobile');
+        els.overlay.classList.add('hidden');
+      });
+
+      // Show dashboard by default, then load vouchers
       loadDashboard();
       loadVouchers();
     })();
