@@ -396,8 +396,7 @@
               btn.disabled = false;
             }
           });
-      }
-
+    }
 
       function escapeHtml(str) {
         if (!str) return '';
@@ -479,7 +478,7 @@
         }
       }
 
-                  function renderImportForm() {
+      function renderImportForm() {
         if (!els.tabImport) return;
         els.tabImport.innerHTML =
           '<h3>Import Vouchers from CSV/XLSX</h3>' +
@@ -535,7 +534,7 @@
         }
       }
 
-            function loadDashboard() {
+      function loadDashboard() {
         if (!els.dashboardChart) return;
 
         var maxRetries = 3;
