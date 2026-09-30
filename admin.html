@@ -6,7 +6,12 @@
   <title>Admin Panel — WiFi Portal</title>
   <link rel="stylesheet" href="assets/style.css">
   <style>
-    body { background: #f0f2f5; margin: 0; font-family: var(--font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif); }
+    body {
+      background: var(--surface-2);
+      margin: 0;
+      font-family: var(--font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+      color: var(--text);
+    }
   </style>
 </head>
 <body>
@@ -21,7 +26,7 @@
           <span class="admin-sidebar__logo-icon">&#128213;</span>
           <span class="admin-sidebar__logo-text">Admin Panel</span>
         </div>
-        <ul class="admin-sidebar__nav">
+        <ul class="admin-sidebar__nav" id="admin-sidebar-nav">
           <li class="admin-sidebar__nav-item">
             <button class="admin-sidebar__nav-link admin-sidebar__nav-link--active" data-page="dashboard">
               <span class="admin-sidebar__nav-link-icon">&#128202;</span>
@@ -61,13 +66,17 @@
 
     <!-- Main Content -->
     <main class="admin-main">
-      <div class="page-title">WiFi Portal — Admin Panel</div>
-      <div class="admin-card">
+      <header class="admin-header">
+        <div class="page-title">WiFi Portal — Admin Panel</div>
+      </header>
+
+      <!-- Dashboard Section -->
+      <div class="admin-card content-section active" id="section-dashboard">
         <h2>Dashboard</h2>
         <div class="admin-grid" id="stats-grid"></div>
         <div id="dashboard-chart">
-          <h3 style="margin-bottom:8px">Voucher Status Breakdown</h3>
-          <canvas id="stats-chart" width="400" height="200" style="max-width:100%; height:200px"></canvas>
+          <h3>Voucher Status Breakdown</h3>
+          <canvas id="stats-chart" width="400" height="200"></canvas>
         </div>
       </div>
 
@@ -90,6 +99,7 @@
       </div>
     </main>
   </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="config/config.js"></script>
   <script>
@@ -99,91 +109,85 @@
       var API_BASE = (window.CONFIG && window.CONFIG.apiBaseUrl) || '';
       var ADMIN_TOKEN = localStorage.getItem('adminToken') || '';
 
-            var els = {
+      // Cache DOM elements
+      var els = {
         statsGrid:      document.getElementById('stats-grid'),
         dashboardChart: document.getElementById('dashboard-chart'),
         tabVouchers:    document.getElementById('tab-vouchers'),
         tabSessions:    document.getElementById('tab-sessions'),
         tabImport:      document.getElementById('tab-import'),
+        sectionDashboard: document.getElementById('section-dashboard'),
+        sectionVouchers: document.getElementById('section-vouchers'),
+        sectionSessions:   document.getElementById('section-sessions'),
+        sectionImport:     document.getElementById('section-import'),
         sidebar:        document.getElementById('admin-sidebar'),
         sidebarToggle:  document.getElementById('sidebar-toggle'),
+        sidebarNav:     document.getElementById('admin-sidebar-nav'),
         overlay:        document.getElementById('admin-overlay'),
-        sectionVouchers: document.getElementById('section-vouchers'),
-        sectionSessions: document.getElementById('section-sessions'),
-        sectionImport:   document.getElementById('section-import'),
       };
 
       var sidebarLinks = document.querySelectorAll('.admin-sidebar__nav-link');
 
       function toggleSidebar(forceState) {
-        var isCollapsed = forceState !== undefined ? forceState : els.sidebar.classList.contains('collapsed');
+        var isCollapsed = forceState !== undefined
+          ? forceState
+          : els.sidebar.classList.contains('collapsed');
         if (isCollapsed) {
           els.sidebar.classList.remove('collapsed');
           els.sidebar.classList.remove('collapsed-mobile');
           els.overlay.classList.add('hidden');
         } else {
           els.sidebar.classList.add('collapsed');
-          els.sidebar.classList.remove('collapsed-mobile');
-          els.overlay.classList.add('hidden');
         }
       }
 
+
       function navigateTo(page) {
-        // Close sidebar on mobile after navigating
         els.sidebar.classList.remove('collapsed-mobile');
         els.overlay.classList.add('hidden');
-
-        // Update active nav link
         sidebarLinks.forEach(function (link) {
           link.classList.remove('admin-sidebar__nav-link--active');
         });
-
         var targetLink = document.querySelector('.admin-sidebar__nav-link[data-page="' + page + '"]');
         if (targetLink) {
           targetLink.classList.add('admin-sidebar__nav-link--active');
         }
-
-        // Show/hide sections
         var sections = [
+          { el: els.sectionDashboard, name: 'dashboard' },
           { el: els.sectionVouchers, name: 'vouchers' },
           { el: els.sectionSessions, name: 'sessions' },
           { el: els.sectionImport, name: 'import' },
         ];
-
         sections.forEach(function (s) {
           if (s.el) {
-            if (s.name === page) {
-              s.el.classList.add('active');
-            } else {
-              s.el.classList.remove('active');
-            }
+            if (s.name === page) { s.el.classList.add('active'); }
+            else { s.el.classList.remove('active'); }
           }
         });
-
-        // Load content for the selected page
-        if (page === 'vouchers') {
-          loadVouchers();
-        } else if (page === 'sessions') {
-          loadSessions();
-        } else if (page === 'import') {
-          renderImportForm();
-        } else if (page === 'logout') {
-          logout();
-        }
+        if (page === 'vouchers') { loadVouchers(); }
+        else if (page === 'sessions') { loadSessions(); }
+        else if (page === 'import') { renderImportForm(); }
       }
+
 
       function logout() {
         localStorage.removeItem('adminToken');
         window.location.href = 'login.html';
       }
 
+      // Fixed api() — handles responses with null/empty bodies (e.g. DELETE 204 No Content)
       function api(path, opts) {
         opts = opts || {};
         opts.headers = opts.headers || {};
         if (ADMIN_TOKEN) opts.headers['Authorization'] = 'Bearer ' + ADMIN_TOKEN;
         return fetch(API_BASE + path, opts)
           .then(function (r) {
-            return r.json().then(function (d) { return { ok: r.ok, data: d }; });
+            var contentType = r.headers.get('content-type') || '';
+            if (contentType.indexOf('application/json') !== -1) {
+              return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; });
+            }
+            // No JSON body (e.g. DELETE 204 No Content) — return empty object
+            return { ok: r.ok, status: r.status, data: {} };
           });
       }
 
@@ -199,142 +203,45 @@
         return '<div class="stat-card"><div class="stat-value">' + (value || 0) + '</div><div class="stat-label">' + label + '</div></div>';
       }
 
+
       function loadVouchers() {
+        if (!els.tabVouchers) return;
         els.tabVouchers.innerHTML = '<p class="muted">Loading…</p>';
         api('/api/admin/vouchers')
           .then(function (res) {
-            if (!res.ok) throw new Error(res.data.error || 'Failed');
-            var v = res.data.vouchers || [];
-            if (!v.length) {
-              els.tabVouchers.innerHTML = '<p class="muted">No vouchers found.</p>';
-              return;
-            }
-            els.tabVouchers.innerHTML = '<table><thead><tr><th>ID</th><th>Code</th><th>Type</th><th>Duration</th><th>Price</th><th>State</th><th>Actions</th></tr></thead><tbody>' +
-              v.map(function (item) {
-                return '<tr><td>' + (item.id || '—') + '</td>' +
-                  '<td>' + escapeHtml(item.code) + '</td>' +
-                  '<td><span class="badge badge-' + (item.type || 'standard') + '">' + (item.type || 'standard') + '</span></td>' +
-                  '<td>' + (item.duration_minutes || 0) + ' min</td>' +
-                  '<td>' + (item.price ? formatPrice(item.price) : '—') + '</td>' +
-                  '<td><span class="badge badge-' + (item.used_at ? 'used' : (item.state || 'active')) + '">' + (item.used_at ? 'Used' : (item.state || 'active')) + '</span></td>' +
-                  '<td><button onclick="deleteVoucher(' + (item.id || 0) + ')">Delete</button></td></tr>';
-              }).join('') + '</tbody></table>';
+            if (!res.ok) throw new Error((res.data && res.data.error) || 'Failed to load vouchers');
+            var vouchers = res.data.vouchers || [];
+            els.tabVouchers.innerHTML = renderVouchers(vouchers);
           })
           .catch(function (err) {
             els.tabVouchers.innerHTML = '<p class="error-msg">' + err.message + '</p>';
           });
       }
 
-      function loadSessions() {
-        els.tabSessions.innerHTML = '<p class="muted">Loading…</p>';
-        api('/api/admin/sessions')
-          .then(function (res) {
-            if (!res.ok) throw new Error(res.data.error || 'Failed');
-            var s = res.data.sessions || [];
-            if (!s.length) {
-              els.tabSessions.innerHTML = '<p class="muted">No active sessions.</p>';
-              return;
-            }
-            els.tabSessions.innerHTML = '<table><thead><tr><th>ID</th><th>MAC</th><th>Type</th><th>State</th><th>Expires</th><th>Actions</th></tr></thead><tbody>' +
-              s.map(function (item) {
-                return '<tr><td>' + escapeHtml(item.session_id || '—') + '</td>' +
-                  '<td>' + escapeHtml(item.client_mac || '—') + '</td>' +
-                  '<td><span class="badge badge-' + (item.voucher_type || 'standard') + '">' + (item.voucher_type || 'standard') + '</span></td>' +
-                  '<td>' + escapeHtml(item.state || '—') + '</td>' +
-                  '<td>' + (item.expires_at ? formatDate(item.expires_at) : '—') + '</td>' +
-                  '<td><button onclick="expireSession(\'' + (item.session_id || '') + '\')">Expire</button></td></tr>';
-              }).join('') + '</tbody></table>';
-          })
-          .catch(function (err) {
-            els.tabSessions.innerHTML = '<p class="error-msg">' + err.message + '</p>';
-          });
-      }
-
-      function renderImportForm() {
-        els.tabImport.innerHTML =
-          '<h3>Import Vouchers from CSV/XLSX</h3>' +
-          '<p class="muted">Required columns: ID, Code, Type, Duration, Price. Code must be 6-digit numeric.</p>' +
-          '<form id="import-form">' +
-          '<div class="form-row">' +
-          '<div style="flex:1; min-width:200px"><label for="import-file">File</label><input type="file" id="import-file" accept=".csv,.xlsx,.xls" style="width:100%"></div>' +
-          '<div style="align-self:flex-end"><button type="submit" class="btn btn--primary">Import Vouchers</button></div>' +
-          '</div></form><div id="import-result"></div>';
-
-        var form = document.getElementById('import-form');
-        if (form) {
-          form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            var fileInput = document.getElementById('import-file');
-            if (!fileInput.files || !fileInput.files[0]) {
-              document.getElementById('import-result').innerHTML = '<p class="error-msg">No file selected</p>';
-              return;
-            }
-            var file = fileInput.files[0];
-            var formData = new FormData();
-            formData.append('file', file);
-            api('/api/admin/vouchers/import', {
-              method: 'POST',
-              body: formData
-            }).then(function (res) {
-              var result = document.getElementById('import-result');
-              if (res.ok) {
-                result.innerHTML = '<p class="success-msg">' + res.data.message + '</p>';
-                loadVouchers();
-              } else {
-                result.innerHTML = '<p class="error-msg">' + (res.data.error || 'Import failed') + '</p>';
-              }
-            }).catch(function (err) {
-              document.getElementById('import-result').innerHTML = '<p class="error-msg">' + err.message + '</p>';
-            });
-          });
+      // Render vouchers table using event delegation — no inline onclick handlers
+      function renderVouchers(vouchers) {
+        if (!vouchers.length) {
+          return '<p class="muted">No vouchers found.</p>';
         }
+        var rows = vouchers.map(function (item) {
+          var stateClass = item.used_at ? 'used' : (item.state || 'active');
+          var stateLabel = item.used_at ? 'Used' : (item.state || 'active');
+          return '<tr>' +
+            '<td>' + (item.id || '—') + '</td>' +
+            '<td>' + escapeHtml(item.code) + '</td>' +
+            '<td><span class="badge badge-' + (item.type || 'standard') + '">' + escapeHtml(item.type || 'standard') + '</span></td>' +
+            '<td>' + (item.duration_minutes || 0) + ' min</td>' +
+            '<td>' + (item.price ? formatPrice(item.price) : '—') + '</td>' +
+            '<td><span class="badge badge-' + stateClass + '">' + escapeHtml(stateLabel) + '</span></td>' +
+            '<td><button type="button" class="btn btn--danger btn--delete-voucher" data-voucher-id="' + (item.id || 0) + '">Delete</button></td>' +
+            '</tr>';
+        }).join('');
+        return '<table><thead><tr><th>ID</th><th>Code</th><th>Type</th><th>Duration</th><th>Price</th><th>State</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
       }
 
-      function loadDashboard() {
-        els.dashboardChart.innerHTML = '<p class="muted">Loading statistics…</p>';
-        api('/api/admin/stats')
-          .then(function (res) {
-            if (!res.ok) throw new Error(res.data.error || 'API error');
-            var s = res.data.stats;
-            els.statsGrid.innerHTML = [
-              stat('Total Vouchers', s.totalVouchers),
-              stat('Active Vouchers', s.activeVouchers),
-              stat('Used Vouchers', s.usedVouchers),
-              stat('Total Sessions', s.totalSessions),
-              stat('Active Sessions', s.activeSessions),
-              stat('Paused Sessions', s.pausedSessions),
-              stat('Premium Sessions', s.premiumSessions),
-              stat('Total Revenue', s.totalRevenue),
-            ].join('');
-            els.dashboardChart.innerHTML =
-              '<canvas id="stats-chart" width="400" height="200" style="max-width:100%"></canvas>';
-            var ctx = document.getElementById('stats-chart').getContext('2d');
-            new Chart(ctx, {
-              type: 'pie',
-              data: {
-                labels: ['Active Vouchers', 'Used Vouchers', 'Expired Vouchers'],
-                datasets: [{
-                  data: [s.activeVouchers, s.usedVouchers, Math.max(0, (s.totalVouchers - s.activeVouchers - s.usedVouchers))],
-                  backgroundColor: ['#2e7d32', '#9e9e9e', '#c62828'],
-                }]
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: { position: 'bottom' }
-                }
-              }
-            });
-          })
-          .catch(function (err) {
-            els.dashboardChart.innerHTML = '<p class="error-msg">Failed to load stats: ' + err.message + '</p>';
-          });
-      }
-
-            window.deleteVoucher = function (id) {
+      // deleteVoucher with explicit button parameter — no reliance on global `event` object
+      function deleteVoucher(id, btn) {
         if (!confirm('Are you sure you want to delete this voucher? This action cannot be undone.')) return;
-        var btn = event ? event.target : null;
         if (btn) {
           btn.classList.add('btn--danger--loading');
           btn.textContent = 'Deleting…';
@@ -346,7 +253,7 @@
               loadVouchers();
               loadDashboard();
             } else {
-              alert(res.data.error || 'Delete failed');
+              alert(res.data && res.data.error || 'Delete failed');
             }
           })
           .catch(function (err) {
@@ -359,23 +266,72 @@
               btn.disabled = false;
             }
           });
-      };
+      }
 
-            window.expireSession = function (sessionId) {
+
+      function loadSessions() {
+        if (!els.tabSessions) return;
+        els.tabSessions.innerHTML = '<p class="muted">Loading…</p>';
+        api('/api/admin/sessions')
+          .then(function (res) {
+            if (!res.ok) throw new Error((res.data && res.data.error) || 'Failed to load sessions');
+            var sessions = res.data.sessions || [];
+            els.tabSessions.innerHTML = renderSessions(sessions);
+          })
+          .catch(function (err) {
+            els.tabSessions.innerHTML = '<p class="error-msg">' + err.message + '</p>';
+          });
+      }
+
+      // Render sessions table using event delegation — no inline onclick handlers
+      function renderSessions(sessions) {
+        if (!sessions.length) {
+          return '<p class="muted">No active sessions.</p>';
+        }
+        var rows = sessions.map(function (item) {
+          return '<tr>' +
+            '<td>' + (item.session_id || '—') + '</td>' +
+            '<td>' + escapeHtml(item.client_mac) + '</td>' +
+            '<td>' + (item.ssid_name || '—') + '</td>' +
+            '<td>' + escapeHtml(item.voucher_type || 'standard') + '</td>' +
+            '<td>' + (item.duration_minutes || 0) + '</td>' +
+            '<td><span class="badge badge-' + (item.state || 'active') + '">' + escapeHtml(item.state || 'active') + '</span></td>' +
+            '<td>' + (item.expires_at ? formatDate(item.expires_at) : '—') + '</td>' +
+            '<td><button type="button" class="btn btn--warning btn--expire-session" data-session-id="' + escapeHtml(item.session_id || '') + '">Expire</button></td>' +
+            '</tr>';
+        }).join('');
+        return '<table><thead><tr><th>ID</th><th>MAC</th><th>SSID</th><th>Type</th><th>Duration</th><th>State</th><th>Expires</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      }
+
+      // expireSession with explicit button parameter — no reliance on global `event` object
+      function expireSession(sessionId, btn) {
         if (!confirm('Expire this session?')) return;
+        if (btn) {
+          btn.classList.add('btn--expire--loading');
+          btn.textContent = 'Expiring…';
+          btn.disabled = true;
+        }
         api('/api/admin/sessions/' + encodeURIComponent(sessionId) + '/expire', { method: 'POST' })
           .then(function (res) {
             if (res.ok) {
               loadSessions();
               loadDashboard();
             } else {
-              alert(res.data.error || 'Expire failed');
+              alert(res.data && res.data.error || 'Expire failed');
             }
           })
           .catch(function (err) {
             alert('Expire failed: ' + err.message);
+          })
+          .finally(function () {
+            if (btn) {
+              btn.classList.remove('btn--expire--loading');
+              btn.textContent = 'Expire';
+              btn.disabled = false;
+            }
           });
-      };
+      }
+
 
       function escapeHtml(str) {
         if (!str) return '';
@@ -391,27 +347,123 @@
         try { return new Date(iso).toLocaleString(); } catch (e) { return iso || ''; }
       }
 
-            // Sidebar navigation handlers
-      sidebarLinks.forEach(function (navLink) {
-        navLink.addEventListener('click', function () {
-          var page = navLink.getAttribute('data-page');
-          if (page === 'logout') {
-            logout();
-            return;
-          }
-          navigateTo(page);
-        });
+      function renderImportForm() {
+        if (!els.tabImport) return;
+        els.tabImport.innerHTML =
+          '<h3>Import Vouchers from CSV/XLSX</h3>' +
+          '<p class="muted">Required columns: Code, Type, Duration, Price. Code must be 6-digit numeric.</p>' +
+          '<form id="import-form">' +
+          '<div class="form-row">' +
+          '<div class="form-field"><label for="import-file">File</label><input type="file" id="import-file" accept=".csv,.xlsx,.xls" style="width:100%"></div>' +
+          '<div class="form-field actions-end"><button type="submit" class="btn btn--primary">Import Vouchers</button></div>' +
+          '</div></form><div id="import-result"></div>';
+
+        var form = document.getElementById('import-form');
+        if (form) {
+          form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var fileInput = document.getElementById('import-file');
+            var result = document.getElementById('import-result');
+            if (!fileInput.files || !fileInput.files[0]) {
+              result.innerHTML = '<p class="error-msg">No file selected</p>';
+              return;
+            }
+            var file = fileInput.files[0];
+            var formData = new FormData();
+            formData.append('file', file);
+            api('/api/admin/vouchers/import', { method: 'POST', body: formData })
+              .then(function (res) {
+                if (res.ok) {
+                  result.innerHTML = '<p class="success-msg">' + (res.data.message || 'Import successful') + '</p>';
+                  loadVouchers();
+                } else {
+                  result.innerHTML = '<p class="error-msg">' + ((res.data && res.data.error) || 'Import failed') + '</p>';
+                }
+              })
+              .catch(function (err) {
+                result.innerHTML = '<p class="error-msg">' + err.message + '</p>';
+              });
+          });
+        }
+      }
+
+      function loadDashboard() {
+        if (!els.dashboardChart) return;
+        els.dashboardChart.innerHTML = '<p class="muted">Loading statistics…</p>';
+        api('/api/admin/stats')
+          .then(function (res) {
+            if (!res.ok) throw new Error((res.data && res.data.error) || 'API error');
+            var s = res.data.stats;
+            if (els.statsGrid) {
+              els.statsGrid.innerHTML = [
+                stat('Total Vouchers', s.totalVouchers),
+                stat('Active Vouchers', s.activeVouchers),
+                stat('Used Vouchers', s.usedVouchers),
+                stat('Total Sessions', s.totalSessions),
+                stat('Active Sessions', s.activeSessions),
+                stat('Paused Sessions', s.pausedSessions),
+                stat('Premium Sessions', s.premiumSessions),
+                stat('Total Revenue', '\u20b1' + (s.totalRevenue / 100).toFixed(2)),
+              ].join('');
+            }
+            els.dashboardChart.innerHTML = '<canvas id="stats-chart" width="400" height="200"></canvas>';
+            var ctx = document.getElementById('stats-chart').getContext('2d');
+            new Chart(ctx, {
+              type: 'pie',
+              data: {
+                labels: ['Active Vouchers', 'Used Vouchers', 'Expired Vouchers'],
+                datasets: [{
+                  data: [s.activeVouchers, s.usedVouchers, Math.max(0, (s.totalVouchers - s.activeVouchers - s.usedVouchers))],
+                  backgroundColor: ['var(--green)', 'var(--text-3)', 'var(--error-text)'],
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } }
+              }
+            });
+          })
+          .catch(function (err) {
+            els.dashboardChart.innerHTML = '<p class="error-msg">Failed to load stats: ' + err.message + '</p>';
+          });
+      }
+
+
+      // Sidebar navigation — event delegation on nav container
+      els.sidebarNav.addEventListener('click', function (e) {
+        var link = e.target.closest('.admin-sidebar__nav-link');
+        if (!link) return;
+        var page = link.getAttribute('data-page');
+        if (page === 'logout') { logout(); return; }
+        navigateTo(page);
       });
 
-      // Hamburger toggle button handler
-      els.sidebarToggle.addEventListener('click', function () {
-        toggleSidebar();
-      });
+      // Hamburger toggle
+      els.sidebarToggle.addEventListener('click', function () { toggleSidebar(); });
 
       // Overlay click closes sidebar (mobile)
       els.overlay.addEventListener('click', function () {
         els.sidebar.classList.remove('collapsed-mobile');
         els.overlay.classList.add('hidden');
+      });
+
+      // Event delegation for voucher delete buttons
+      document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.btn--delete-voucher');
+        if (btn) {
+          var id = btn.getAttribute('data-voucher-id');
+          deleteVoucher(id, btn);
+        }
+      });
+
+      // Event delegation for session expire buttons
+      document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.btn--expire-session');
+        if (btn) {
+          var sid = btn.getAttribute('data-session-id');
+          expireSession(sid, btn);
+        }
       });
 
       // Show dashboard by default, then load vouchers
@@ -421,7 +473,3 @@
   </script>
 </body>
 </html>
-
-
-
-
