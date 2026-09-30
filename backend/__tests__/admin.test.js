@@ -201,8 +201,38 @@ describe('DELETE /api/admin/vouchers/:id — Voucher Deletion', () => {
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
 
-    // Original voucher should still exist
+        // Original voucher should still exist
     const voucher = await getDb().getOne('SELECT id FROM vouchers WHERE id = ?', [voucherId]);
     expect(voucher).toBeTruthy();
+  });
+});
+
+describe('GET /api/admin/me — Admin Info', () => {
+  test('returns 200 + username with valid API key', async () => {
+    const res = await request(app)
+      .get('/api/admin/me')
+      .set('X-API-Key', VALID_KEY);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.username).toBe('admin');
+  });
+
+  test('returns 200 + username with valid Bearer token', async () => {
+    const res = await request(app)
+      .get('/api/admin/me')
+      .set('Authorization', 'Bearer ' + VALID_KEY);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.username).toBe('admin');
+  });
+
+  test('returns 401 when no API key or Authorization header is provided', async () => {
+    const res = await request(app)
+      .get('/api/admin/me');
+
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
   });
 });

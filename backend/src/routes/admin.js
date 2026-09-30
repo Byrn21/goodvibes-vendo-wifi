@@ -2,16 +2,19 @@
  * routes/admin.js — Admin management API
  *
  * All endpoints require an API key passed in the `X-API-Key` header,
+ * or a valid login session token passed in the `Authorization: Bearer` header,
  * matching process.env.ADMIN_API_KEY.
  *
  * Endpoints:
- *   GET    /api/admin/vouchers    — List all vouchers
- *   POST   /api/admin/vouchers    — Create a new voucher
+ *   POST   /api/admin/login      — Authenticate and receive a session token
+ *   GET    /api/admin/me         — Get current admin username
+ *   GET    /api/admin/vouchers   — List all vouchers
+ *   POST   /api/admin/vouchers   — Create a new voucher
  *   PUT    /api/admin/vouchers/:id — Update a voucher
  *   DELETE /api/admin/vouchers/:id — Delete a voucher
- *   GET    /api/admin/sessions    — List active sessions
+ *   GET    /api/admin/sessions   — List active sessions
  *   POST   /api/admin/sessions/:id/expire — Force-expire a session
- *   GET    /api/admin/stats       — Dashboard statistics
+ *   GET    /api/admin/stats      — Dashboard statistics
  */
 
 const express = require('express');
@@ -54,6 +57,15 @@ router.post('/login', (req, res, next) => {
 });
 
 router.use(requireAuth);
+
+// Get current admin info (requires valid session token or API key)
+router.get('/me', (req, res) => {
+  res.json({
+    success: true,
+    username: ADMIN_USERNAME,
+  });
+});
+
 
 // List all vouchers
 router.get('/vouchers', async (req, res, next) => {
