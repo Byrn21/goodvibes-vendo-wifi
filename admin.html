@@ -601,7 +601,7 @@
             .catch(function (err) {
               if (err.message === 'RATE_LIMITED' && attempt < maxRetries) {
                 attempt++;
-                showLoading('Retrying in 4 seconds... (attempt ' + attempt + ' of ' + maxRetries + '));
+                showLoading('Retrying in 4 seconds... (attempt ' + attempt + ' of ' + maxRetries + ')');
                 setTimeout(fetchStats, retryDelay);
               } else if (err.message === 'RATE_LIMITED') {
                 els.dashboardChart.innerHTML =
