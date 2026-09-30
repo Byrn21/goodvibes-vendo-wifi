@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Panel â€” WiFi Portal</title>
+  <title>Admin Panel &mdash; WiFi Portal</title>
   <link rel="stylesheet" href="assets/style.css">
   <style>
     body {
@@ -19,13 +19,13 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <body>
   <div class="admin-layout">
-         <!-- Mobile burger toggle â€” always fixed at top-left, outside the sidebar -->
+         <!-- Mobile burger toggle &mdash; always fixed at top-left, outside the sidebar -->
     <button class="admin-sidebar__toggle" id="sidebar-toggle" aria-label="Toggle navigation">
                   <i class="bi bi-list"></i>
     </button>
 
     <!-- Collapsible Sidebar -->
-    <aside class="admin-sidebar" id="admin-sidebar">
+    <aside class="admin-sidebar collapsed-mobile" id="admin-sidebar">
       <div class="admin-sidebar__header"></div>
       <div class="admin-sidebar__content">
         <div class="admin-sidebar__logo">
@@ -83,7 +83,7 @@
     <!-- Main Content -->
     <main class="admin-main">
       <header class="admin-header">
-        <div class="page-title">WiFi Portal â€” Admin Panel</div>
+        <div class="page-title">WiFi Portal &mdash; Admin Panel</div>
       </header>
 
       <!-- Dashboard Section -->
@@ -219,7 +219,7 @@
         window.location.href = 'login.html';
       }
 
-      // Fixed api() â€” handles responses with null/empty bodies (e.g. DELETE 204 No Content)
+      // Fixed api() &mdash; handles responses with null/empty bodies (e.g. DELETE 204 No Content)
       function api(path, opts) {
         opts = opts || {};
         opts.headers = opts.headers || {};
@@ -230,7 +230,7 @@
             if (contentType.indexOf('application/json') !== -1) {
               return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; });
             }
-            // No JSON body (e.g. DELETE 204 No Content) â€” return empty object
+            // No JSON body (e.g. DELETE 204 No Content) &mdash; return empty object
             return { ok: r.ok, status: r.status, data: {} };
           });
       }
@@ -283,7 +283,7 @@
           });
       }
 
-      // Render vouchers table using event delegation â€” no inline onclick handlers
+      // Render vouchers table using event delegation &mdash; no inline onclick handlers
       function renderVouchers(vouchers) {
         if (!vouchers.length) {
           return '<p class="muted">No vouchers found.</p>';
@@ -292,11 +292,11 @@
           var stateClass = item.used_at ? 'used' : (item.state || 'active');
           var stateLabel = item.used_at ? 'Used' : (item.state || 'active');
           return '<tr>' +
-            '<td>' + (item.id || 'â€”') + '</td>' +
+            '<td>' + (item.id || '&mdash;') + '</td>' +
             '<td>' + escapeHtml(item.code) + '</td>' +
             '<td><span class="badge badge-' + (item.type || 'standard') + '">' + escapeHtml(item.type || 'standard') + '</span></td>' +
             '<td>' + (item.duration_minutes || 0) + ' min</td>' +
-            '<td>' + (item.price ? formatPrice(item.price) : 'â€”') + '</td>' +
+            '<td>' + (item.price ? formatPrice(item.price) : '&mdash;') + '</td>' +
             '<td><span class="badge badge-' + stateClass + '">' + escapeHtml(stateLabel) + '</span></td>' +
             '<td><button type="button" class="btn btn--danger btn--delete-voucher" data-voucher-id="' + (item.id || 0) + '">Delete</button></td>' +
             '</tr>';
@@ -304,7 +304,7 @@
         return '<table><thead><tr><th>ID</th><th>Code</th><th>Type</th><th>Duration</th><th>Price</th><th>State</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
       }
 
-      // deleteVoucher with explicit button parameter â€” no reliance on global `event` object
+      // deleteVoucher with explicit button parameter &mdash; no reliance on global `event` object
       function deleteVoucher(id, btn) {
         if (!confirm('Are you sure you want to delete this voucher? This action cannot be undone.')) return;
         if (btn) {
@@ -348,27 +348,27 @@
           });
       }
 
-      // Render sessions table using event delegation â€” no inline onclick handlers
+      // Render sessions table using event delegation &mdash; no inline onclick handlers
       function renderSessions(sessions) {
         if (!sessions.length) {
           return '<p class="muted">No active sessions.</p>';
         }
         var rows = sessions.map(function (item) {
           return '<tr>' +
-            '<td>' + (item.session_id || 'â€”') + '</td>' +
+            '<td>' + (item.session_id || '&mdash;') + '</td>' +
             '<td>' + escapeHtml(item.client_mac) + '</td>' +
-            '<td>' + (item.ssid_name || 'â€”') + '</td>' +
+            '<td>' + (item.ssid_name || '&mdash;') + '</td>' +
             '<td>' + escapeHtml(item.voucher_type || 'standard') + '</td>' +
             '<td>' + (item.duration_minutes || 0) + '</td>' +
             '<td><span class="badge badge-' + (item.state || 'active') + '">' + escapeHtml(item.state || 'active') + '</span></td>' +
-            '<td>' + (item.expires_at ? formatDate(item.expires_at) : 'â€”') + '</td>' +
+            '<td>' + (item.expires_at ? formatDate(item.expires_at) : '&mdash;') + '</td>' +
             '<td><button type="button" class="btn btn--warning btn--expire-session" data-session-id="' + escapeHtml(item.session_id || '') + '">Expire</button></td>' +
             '</tr>';
         }).join('');
         return '<table><thead><tr><th>ID</th><th>MAC</th><th>SSID</th><th>Type</th><th>Duration</th><th>State</th><th>Expires</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
       }
 
-      // expireSession with explicit button parameter â€” no reliance on global `event` object
+      // expireSession with explicit button parameter &mdash; no reliance on global `event` object
       function expireSession(sessionId, btn) {
         if (!confirm('Expire this session?')) return;
         if (btn) {
@@ -616,7 +616,7 @@
         fetchStats();
       }
 
-      // Sidebar navigation â€” event delegation on nav container
+      // Sidebar navigation &mdash; event delegation on nav container
       els.sidebarNav.addEventListener('click', function (e) {
         var link = e.target.closest('.admin-sidebar__nav-link');
         if (!link) return;
@@ -669,24 +669,34 @@
         }
       });
 
-                  // Reset sidebar state on resize between mobile/desktop breakpoints
-      window.addEventListener('resize', function () {
-        var isMobile = window.innerWidth <= 768;
-        if (isMobile) {
-          els.sidebar.classList.remove('collapsed');
-          els.sidebar.classList.remove('collapsed-mobile');
-          els.overlay.classList.add('hidden');
-          setToggleIcon(false);
-        } else {
-          els.sidebar.classList.remove('collapsed-mobile');
-          els.overlay.classList.add('hidden');
-          els.sidebar.classList.remove('collapsed');
-          setToggleIcon(false);
-        }
-      });
+                                    // Reset sidebar state on resize between mobile/desktop breakpoints
+                  (function () {
+                    var resizeTimer;
+                    var lastBreakpoint = window.innerWidth <= 768 ? 'mobile' : 'desktop';
+                    window.addEventListener('resize', function () {
+                      clearTimeout(resizeTimer);
+                      resizeTimer = setTimeout(function () {
+                        var isMobile = window.innerWidth <= 768;
+                        var currentBreakpoint = isMobile ? 'mobile' : 'desktop';
+                        if (currentBreakpoint === lastBreakpoint) return;
+                        lastBreakpoint = currentBreakpoint;
+                        if (isMobile) {
+                          els.sidebar.classList.remove('collapsed');
+                          els.sidebar.classList.add('collapsed-mobile');
+                          els.overlay.classList.add('hidden');
+                          setToggleIcon(true);
+                        } else {
+                          els.sidebar.classList.remove('collapsed-mobile');
+                          els.sidebar.classList.remove('collapsed');
+                          els.overlay.classList.add('hidden');
+                          setToggleIcon(false);
+                        }
+                      }, 100);
+                    });
+                  })();
 
-      // Initialize toggle icon state (sidebar starts expanded)
-      setToggleIcon(false);
+      // Initialize toggle icon state (sidebar starts collapsed on mobile, expanded on desktop)
+      setToggleIcon(window.innerWidth <= 768);
 
       // Show dashboard by default, then load vouchers
       loadDashboard();
@@ -695,3 +705,6 @@
   </script>
 </body>
 </html>
+
+
+

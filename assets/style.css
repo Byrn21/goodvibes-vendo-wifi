@@ -2062,6 +2062,26 @@ body {
   margin-top: 4px;
 }
 
+/* Mobile stats grid - compact 2-column layout */
+@media (max-width: 768px) {
+  .admin-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .stat-card {
+    padding: 14px;
+  }
+  
+  .stat-value {
+    font-size: 1.5rem;
+  }
+  
+  .stat-label {
+    font-size: 0.75rem;
+  }
+}
+
 /* Tables */
 .admin-table-container {
   overflow-x: auto;
