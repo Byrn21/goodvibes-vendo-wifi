@@ -276,6 +276,24 @@ router.post('/vouchers/import', upload.single('file'), async (req, res, next) =>
       });
     }
 
+    // Validate optional ID column (if present, must be numeric)
+    const invalidIds = [];
+    rows.forEach((row, index) => {
+      if (row.ID !== undefined && row.ID !== null && String(row.ID).trim() !== '') {
+        const idStr = String(row.ID).trim();
+        if (!/^\d+$/.test(idStr)) {
+          invalidIds.push(`Row ${index + 1}: "${idStr}"`);
+        }
+      }
+    });
+
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid ID format (must be numeric). Invalid: ${invalidIds.join('; ')}`,
+      });
+    }
+
     // Insert vouchers into database
     const db = getDb();
     let inserted = 0;

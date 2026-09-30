@@ -19,14 +19,15 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <body>
   <div class="admin-layout">
+         <!-- Mobile burger toggle — always fixed at top-left, outside the sidebar -->
+    <button class="admin-sidebar__toggle" id="sidebar-toggle" aria-label="Toggle navigation">
+      <i class="bi bi-list"></i>
+      <span class="admin-sidebar__toggle-text">Close</span>
+    </button>
+
     <!-- Collapsible Sidebar -->
     <aside class="admin-sidebar" id="admin-sidebar">
-      <div class="admin-sidebar__header">
-        <button class="admin-sidebar__toggle" id="sidebar-toggle" aria-label="Toggle navigation">
-          <i class="bi bi-list"></i>
-          <span class="admin-sidebar__toggle-text">Close</span>
-        </button>
-      </div>
+      <div class="admin-sidebar__header"></div>
       <div class="admin-sidebar__content">
         <div class="admin-sidebar__logo">
           <span class="admin-sidebar__logo-icon">&#128213;</span>
@@ -413,10 +414,10 @@
       }
 
       // Template data shared by CSV and XLSX export
-      var TEMPLATE_HEADERS = ['Code', 'Type', 'Duration', 'Price'];
+      var TEMPLATE_HEADERS = ['ID', 'Code', 'Type', 'Duration', 'Price'];
       var TEMPLATE_ROWS = [
-        ['123456', 'standard', 60, '\u20b150.00'],
-        ['789012', 'premium', 120, '\u20b1100.00']
+        [1, '123456', 'standard', 60, '\u20b150.00'],
+        [2, '789012', 'premium', 120, '\u20b1100.00']
       ];
 
       function buildCsv() {
@@ -455,7 +456,7 @@
         var wsData = [TEMPLATE_HEADERS].concat(TEMPLATE_ROWS);
         var ws = XLSX.utils.aoa_to_sheet(wsData);
         // Set column widths for readability
-        ws['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 14 }];
+        ws['!cols'] = [{ wch: 6 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 14 }];
         var wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Vouchers');
         var wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -482,7 +483,7 @@
         if (!els.tabImport) return;
         els.tabImport.innerHTML =
           '<h3>Import Vouchers from CSV/XLSX</h3>' +
-          '<p class="muted">Required columns: Code, Type, Duration, Price. Code must be 6-digit numeric.</p>' +
+          '<p class="muted">Required columns: ID, Code, Type, Duration, Price. Code must be 6-digit numeric (ID should auto-increment starting from 1).</p>' +
           '<form id="import-form">' +
           '<div class="form-row">' +
           '<div class="form-field"><label for="import-file">File</label><input type="file" id="import-file" accept=".csv,.xlsx,.xls" style="width:100%"></div>' +
@@ -534,48 +535,88 @@
         }
       }
 
-      function loadDashboard() {
+            function loadDashboard() {
         if (!els.dashboardChart) return;
-        els.dashboardChart.innerHTML = '<p class="muted">Loading statistics…</p>';
-        api('/api/admin/stats')
-          .then(function (res) {
-            if (!res.ok) throw new Error((res.data && res.data.error) || 'API error');
-            var s = res.data.stats;
-            if (els.statsGrid) {
-              els.statsGrid.innerHTML = [
-                stat('Total Vouchers', s.totalVouchers),
-                stat('Active Vouchers', s.activeVouchers),
-                stat('Used Vouchers', s.usedVouchers),
-                stat('Total Sessions', s.totalSessions),
-                stat('Active Sessions', s.activeSessions),
-                stat('Paused Sessions', s.pausedSessions),
-                stat('Premium Sessions', s.premiumSessions),
-                stat('Total Revenue', '\u20b1' + (s.totalRevenue / 100).toFixed(2)),
-              ].join('');
-            }
-            els.dashboardChart.innerHTML = '<canvas id="stats-chart" width="400" height="200"></canvas>';
-            var ctx = document.getElementById('stats-chart').getContext('2d');
-            new Chart(ctx, {
-              type: 'pie',
-              data: {
-                labels: ['Active Vouchers', 'Used Vouchers', 'Expired Vouchers'],
-                datasets: [{
-                  data: [s.activeVouchers, s.usedVouchers, Math.max(0, (s.totalVouchers - s.activeVouchers - s.usedVouchers))],
-                  backgroundColor: ['var(--green)', 'var(--text-3)', 'var(--error-text)'],
-                }]
-              },
-              options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom' } }
+
+        var maxRetries = 3;
+        var retryDelay = 4000;
+        var attempt = 0;
+
+        function showLoading(msg) {
+          els.dashboardChart.innerHTML =
+            '<div class="loading-container">' +
+            '<div class="spinner"></div>' +
+            '<p class="muted">' + msg + '</p>' +
+            '</div>';
+        }
+
+        function fetchStats() {
+          showLoading('Loading dashboard data, please wait a moment...');
+
+          api('/api/admin/stats')
+            .then(function (res) {
+              if (!res.ok) {
+                var errMsg = (res.data && res.data.error) || '';
+                if (res.status === 429 ||
+                    errMsg.toLowerCase().includes('too many requests') ||
+                    errMsg.toLowerCase().includes('rate')) {
+                  throw new Error('RATE_LIMITED');
+                }
+                throw new Error(errMsg || 'API error');
+              }
+
+              var s = res.data.stats;
+
+              if (els.statsGrid) {
+                els.statsGrid.innerHTML = [
+                  stat('Total Vouchers', s.totalVouchers),
+                  stat('Active Vouchers', s.activeVouchers),
+                  stat('Used Vouchers', s.usedVouchers),
+                  stat('Total Sessions', s.totalSessions),
+                  stat('Active Sessions', s.activeSessions),
+                  stat('Paused Sessions', s.pausedSessions),
+                  stat('Premium Sessions', s.premiumSessions),
+                  stat('Total Revenue', '\u20b1' + (s.totalRevenue / 100).toFixed(2)),
+                ].join('');
+              }
+
+              els.dashboardChart.innerHTML = '<canvas id="stats-chart" width="400" height="200"></canvas>';
+              var ctx = document.getElementById('stats-chart').getContext('2d');
+
+              new Chart(ctx, {
+                type: 'pie',
+                data: {
+                  labels: ['Active Vouchers', 'Used Vouchers', 'Expired Vouchers'],
+                  datasets: [{
+                    data: [s.activeVouchers, s.usedVouchers, Math.max(0, (s.totalVouchers - s.activeVouchers - s.usedVouchers))],
+                    backgroundColor: ['var(--green)', 'var(--error)', 'var(--text-3)'],
+                  }]
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { position: 'bottom' } }
+                }
+              });
+            })
+            .catch(function (err) {
+              if (err.message === 'RATE_LIMITED' && attempt < maxRetries) {
+                attempt++;
+                showLoading('Retrying in 4 seconds... (attempt ' + attempt + ' of ' + maxRetries + '));
+                setTimeout(fetchStats, retryDelay);
+              } else if (err.message === 'RATE_LIMITED') {
+                els.dashboardChart.innerHTML =
+                  '<p class="muted">The server is busy (rate limited). ' +
+                  '<a href="javascript:loadDashboard()">Refresh now</a> ' +
+                  'or try again in a few minutes.</p>';
+              } else {
+                els.dashboardChart.innerHTML = '<p class="error-msg">Failed to load stats: ' + err.message + '</p>';
               }
             });
-          })
-          .catch(function (err) {
-            els.dashboardChart.innerHTML = '<p class="error-msg">Failed to load stats: ' + err.message + '</p>';
-          });
-      }
+        }
 
+        fetchStats();
+      }
 
       // Sidebar navigation — event delegation on nav container
       els.sidebarNav.addEventListener('click', function (e) {

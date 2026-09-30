@@ -31,9 +31,12 @@
   --border-light:   #e8d5bc;
   --border-focus:   #5c3d11;
 
-  --error-bg:       #fff0ed;
+    --error-bg:       #fff0ed;
   --error-border:   #c0392b;
   --error-text:     #a93226;
+  --error:          #dc2626;   /* solid red for charts/badges */
+  --error-light:    #fee2e2;
+  --error-hover:    #bb1926;
 
   --success-bg:     #e8f5e9;
   --success-border: #2d6a4f;
@@ -45,6 +48,9 @@
 
   --paused-bg:      #fff8e1;
   --paused-border:  #e67e22;
+
+  --grey:           #9ca3af;   /* neutral grey for expired states */
+  --grey-light:     #e5e7eb;
 
   --radius-xs:  6px;
   --radius-sm:  10px;
@@ -1805,10 +1811,15 @@ body {
 }
 
 @media (max-width: 768px) {
+  /* Toggle is outside sidebar — always fixed at top-left */
   .admin-sidebar__toggle {
+    position: fixed;
+    top: 12px;
+    left: 12px;
     display: flex;
     align-items: center;
     gap: 6px;
+    z-index: 1002;
   }
 
   .admin-sidebar__toggle .admin-sidebar__toggle-text {
@@ -1827,8 +1838,13 @@ body {
 }
 
 @media (min-width: 769px) {
+  /* Toggle is a sibling of sidebar — always visible on desktop */
   .admin-sidebar__toggle {
     display: block;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 1002;
   }
 
   .admin-sidebar {
@@ -1836,16 +1852,17 @@ body {
     transition: transform 0.3s ease, width 0.3s ease;
   }
 
-    /* Desktop collapsed = icon-only (narrow but visible, text hidden) */
+  /* Desktop collapsed = icon-only (narrow but visible, text hidden) */
   .admin-sidebar.collapsed {
     width: 60px;
   }
 
-  .admin-sidebar.collapsed .admin-sidebar__toggle {
+  /* Toggle stays fixed when sidebar is collapsed on desktop */
+  .admin-sidebar.collapsed ~ .admin-sidebar__toggle {
     position: fixed;
     top: 12px;
     left: 12px;
-    z-index: 1001;
+    z-index: 1002;
   }
 
   .admin-overlay {
@@ -2055,8 +2072,8 @@ table tbody tr:hover {
 .badge-standard { background-color: var(--blue-light, #dbeafe); color: var(--blue, #1d4ed8); }
 .badge-premium { background-color: var(--purple-light, #ede9fe); color: var(--purple, #7c3aed); }
 .badge-active { background-color: var(--green-light, #dcfce7); color: var(--green, #15803d); }
-.badge-used { background-color: var(--orange-light, #ffedd5); color: var(--orange, #c24101); }
-.badge-expired { background-color: var(--error-light, #fee2e2); color: var(--error, #dc2626); }
+.badge-used { background-color: var(--error-light, #fee2e2); color: var(--error, #dc2626); }
+.badge-expired { background-color: var(--grey-light, #e5e7eb); color: var(--grey, #6b7280); }
 .badge-paused { background-color: var(--yellow-light, #fef3c7); color: var(--yellow, #a16207); }
 
 /* Buttons */
@@ -2162,6 +2179,30 @@ table tbody tr:hover {
 .muted {
   color: var(--text-muted, #64748b);
   font-size: 0.9rem;
+}
+
+/* Loading spinner */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  min-height: 120px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-light, #e8d5bc);
+  border-top-color: var(--primary, #5c3d11);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* Chart container */

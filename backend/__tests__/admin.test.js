@@ -236,3 +236,110 @@ describe('GET /api/admin/me — Admin Info', () => {
     expect(res.body.success).toBe(false);
   });
 });
+
+describe('POST /api/admin/vouchers/import — Voucher Import', () => {
+  const XLSX = require('xlsx');
+
+  function buildCsv(headers, rows) {
+    const lines = [headers.join(',')];
+    rows.forEach(row => {
+      lines.push(headers.map(h => String(row[h] || '')).join(','));
+    });
+    return Buffer.from(lines.join('\n'), 'utf8');
+  }
+
+  function buildXlsx(headers, rows) {
+    const wsData = [headers].concat(
+      rows.map(r => headers.map(h => r[h]))
+    );
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Vouchers');
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'buffer' });
+    return wbout;
+  }
+
+  test('accepts CSV with correct ID,Code,Type,Duration,Price columns and imports vouchers', async () => {
+    const csv = buildCsv(
+      ['ID', 'Code', 'Type', 'Duration', 'Price'],
+      [
+        { ID: 1, Code: '111111', Type: 'standard', Duration: 60, Price: '50.00' },
+        { ID: 2, Code: '222222', Type: 'premium',  Duration: 120, Price: '100.00' },
+      ]
+    );
+
+    const res = await request(app)
+      .post('/api/admin/vouchers/import')
+      .set('X-API-Key', VALID_KEY)
+      .attach('file', csv, 'test.csv');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.summary.inserted).toBe(2);
+  });
+
+  test('accepts XLSX with correct columns including ID', async () => {
+    const xlsxBuf = buildXlsx(
+      ['ID', 'Code', 'Type', 'Duration', 'Price'],
+      [
+        { ID: 1, Code: '333333', Type: 'standard', Duration: 60, Price: 3500 },
+        { ID: 2, Code: '444444', Type: 'premium',  Duration: 120, Price: 9000 },
+      ]
+    );
+
+    const res = await request(app)
+      .post('/api/admin/vouchers/import')
+      .set('X-API-Key', VALID_KEY)
+      .attach('file', xlsxBuf, 'test.xlsx');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.summary.inserted).toBe(2);
+  });
+
+  test('returns 400 when ID column is missing', async () => {
+    const csv = buildCsv(
+      ['Code', 'Type', 'Duration', 'Price'],
+      [{ Code: '555555', Type: 'standard', Duration: 60, Price: '50.00' }]
+    );
+
+    const res = await request(app)
+      .post('/api/admin/vouchers/import')
+      .set('X-API-Key', VALID_KEY)
+      .attach('file', csv, 'bad.csv');
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toContain('Missing required columns');
+  });
+
+  test('returns 400 when ID contains non-numeric values', async () => {
+    const csv = buildCsv(
+      ['ID', 'Code', 'Type', 'Duration', 'Price'],
+      [{ ID: 'abc', Code: '666666', Type: 'standard', Duration: 60, Price: '50.00' }]
+    );
+
+    const res = await request(app)
+      .post('/api/admin/vouchers/import')
+      .set('X-API-Key', VALID_KEY)
+      .attach('file', csv, 'bad_ids.csv');
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toContain('Invalid ID format');
+  });
+
+  test('returns 401 without API key', async () => {
+    const csv = buildCsv(
+      ['ID', 'Code', 'Type', 'Duration', 'Price'],
+      [{ ID: 1, Code: '777777', Type: 'standard', Duration: 60, Price: '50.00' }]
+    );
+
+    const res = await request(app)
+      .post('/api/admin/vouchers/import')
+      .attach('file', csv, 'nontest.csv');
+
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+  });
+});
