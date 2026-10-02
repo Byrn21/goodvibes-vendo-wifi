@@ -21,6 +21,8 @@ const path = require('path');
 const authRoutes = require('./routes/auth');
 const sessionRoutes = require('./routes/session');
 const adminRoutes = require('./routes/admin');
+const webhookRoutes = require('./routes/webhook');
+const paymentRoutes = require('./routes/payment');
 const { startExpirationWorker } = require('./services/session');
 const { fixMissingColumns } = require('./db/migrate_fix');
 
@@ -133,6 +135,8 @@ app.use('/api/', apiLimiter);
 app.use('/api/auth',     authRoutes);
 app.use('/api/session',  sessionRoutes);
 app.use('/api/admin',    adminRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/payment',  paymentRoutes);
 
 // Health check (unauthenticated)
 app.get('/health', (req, res) => {

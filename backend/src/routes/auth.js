@@ -15,6 +15,7 @@ const omadaService = require('../services/omada');
 const { validateVoucher, recordSession } = require('../services/session');
 const { normalizeVoucherCode, validateVoucherCodeFormat } = require('../utils/voucher-code');
 const { normalizeMac: normalizeDeviceMac } = require('../utils/device-id');
+const { getDb } = require('../db/client');
 const { v4: uuidv4 } = require('uuid');
 
 // POST /api/auth
@@ -88,6 +89,19 @@ router.post('/', async (req, res, next) => {
     const voucherTypeResolved = voucherResult.type || voucherType || 'standard';
 
     // ── Call Omada extPortal/auth ──────────────────────────
+    // radioId is not sent by the voucher form; pull it from the
+    // portal_client_context captured at portal landing (defaults to 0).
+    let radioId = 0;
+    try {
+      const ctxRow = await getDb().getOne(
+        'SELECT radio_id FROM portal_client_context WHERE client_mac = ?',
+        [normalizedMac]
+      );
+      if (ctxRow && ctxRow.radio_id !== null && ctxRow.radio_id !== undefined) {
+        radioId = ctxRow.radio_id;
+      }
+    } catch (_) { /* context table may not exist yet in legacy DBs — default 0 */ }
+
     let omadaResult;
     try {
       omadaResult = await omadaService.authenticateClient({
@@ -95,8 +109,8 @@ router.post('/', async (req, res, next) => {
         clientIp: clientIp || '',
         apMac: apMac || '',
         ssidName: ssidName || '',
-        username: voucherTypeResolved === 'premium' ? 'prem_' + normalizedVoucher : normalizedVoucher,
-        password: normalizedVoucher,
+        radioId,
+        durationMinutes: duration,
         sessionId,
       });
     } catch (omadaErr) {

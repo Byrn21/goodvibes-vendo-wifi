@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS sessions (
         id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id          VARCHAR(32) NOT NULL UNIQUE,
     client_mac          VARCHAR(32) NOT NULL,
+    ref_no              VARCHAR(64) UNIQUE,
     client_ip           VARCHAR(45),
     ap_mac              VARCHAR(32),
     ssid_name           VARCHAR(64),
@@ -58,6 +59,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE TABLE IF NOT EXISTS webhook_events (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id     VARCHAR(128) NOT NULL UNIQUE,
+    ref_no       VARCHAR(64) UNIQUE,
     session_id   VARCHAR(32),
         provider     VARCHAR(16),
     event_type   VARCHAR(64),
@@ -65,6 +67,14 @@ CREATE TABLE IF NOT EXISTS webhook_events (
     status       VARCHAR(16),
     processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ref_no duplicate protection (payment reference numbers are unique per
+-- transaction; SQLite enforces this via the UNIQUE column constraint above,
+-- PostgreSQL via the partial unique index created in migrate_add_ref_no.js
+CREATE INDEX IF NOT EXISTS idx_sessions_provider   ON sessions(provider_session_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_ref_no ON sessions(ref_no) WHERE ref_no IS NOT NULL;
+-- and replicated here for fresh production databases):
+CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_events_ref_no ON webhook_events(ref_no) WHERE ref_no IS NOT NULL;
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_sessions_state      ON sessions(state);
@@ -82,6 +92,33 @@ CREATE TABLE IF NOT EXISTS admin_users (
     role          VARCHAR(16) DEFAULT 'admin',
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login    TIMESTAMP
+);
+
+-- ================================================================
+-- Portal client context
+-- ================================================================
+-- Controller context (AP MAC / SSID / radio ID) captured when a client
+-- lands on the captive portal page, keyed by client MAC. The payment
+-- webhook reads this row to authorize the client via extPortal/auth.
+--
+-- ASSUMPTION (single-site deployment): the lookup key is client_mac
+-- alone. The `site` column records the site at capture time for future
+-- collision detection only — see migrate_add_portal_context.js.
+--
+-- Staleness: rows older than PORTAL_CONTEXT_MAX_AGE_MS (config/index.js,
+-- 1 hour) are treated as MISSING by the webhook (fail-loud
+-- MISSING_PORTAL_CONTEXT path). seen_at is refreshed on every portal
+-- page load by the landing beacon.
+CREATE TABLE IF NOT EXISTS portal_client_context (
+    client_mac  VARCHAR(32) PRIMARY KEY,
+    client_ip   VARCHAR(45),
+    ap_mac      VARCHAR(32) NOT NULL,
+    ssid_name   VARCHAR(64) NOT NULL,
+    radio_id    INTEGER NOT NULL DEFAULT 0,
+    site        VARCHAR(64) NOT NULL DEFAULT 'Default',
+    seen_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ================================================================

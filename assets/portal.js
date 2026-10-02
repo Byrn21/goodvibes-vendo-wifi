@@ -48,6 +48,7 @@
       clientIp:    'clientIp',
       apMac:       'apMac',
       ssidName:    'ssidName',
+      radioId:     'radioId',
       redirectUrl: 'redirectUrl',
       originalUrl: 'originalUrl',
       authUrl:     'authUrl',
@@ -308,6 +309,7 @@
         'clientIp=' + encodeURIComponent(queryParams.clientIp || ''),
         'apMac=' + encodeURIComponent(queryParams.apMac || ''),
         'ssidName=' + encodeURIComponent(queryParams.ssidName || ''),
+        'radioId=' + encodeURIComponent(queryParams.radioId || '0'),
         'redirectUrl=' + encodeURIComponent(getRedirectDestination()),
       ].join('&');
 
@@ -326,6 +328,7 @@
         'clientIp=' + encodeURIComponent(queryParams.clientIp || ''),
         'apMac=' + encodeURIComponent(queryParams.apMac || ''),
         'ssidName=' + encodeURIComponent(queryParams.ssidName || ''),
+        'radioId=' + encodeURIComponent(queryParams.radioId || '0'),
         'redirectUrl=' + encodeURIComponent(getRedirectDestination()),
       ].join('&');
 
@@ -754,6 +757,7 @@
             'planId=' + encodeURIComponent(selectedType.planId),
             'plan=' + encodeURIComponent(planSelect.value),
             'clientMac=' + encodeURIComponent(queryParams.clientMac || ''),
+            'radioId=' + encodeURIComponent(queryParams.radioId || '0'),
           ].join('&');
 
           window.location.href = checkoutUrl;
@@ -1189,11 +1193,55 @@
   }
 
   // ===============================================================
+  // CONTEXT CAPTURE BEACON (fire-and-forget)
+  // ===============================================================
+  /**
+   * sendContextBeacon — POST the controller context to
+   * /api/payment/context on portal landing so the payment webhook can
+   * authorize this device later. Fire-and-forget: a .catch() swallows
+   * network errors so the beacon NEVER blocks or breaks the portal UI.
+   * If capture fails, the webhook's MISSING_PORTAL_CONTEXT fail-loud
+   * path handles it (durable payment + 422 + re-open-portal resolution).
+   */
+  function sendContextBeacon() {
+    if (!queryParams.clientMac || !queryParams.apMac || !queryParams.ssidName) {
+      // Incomplete context — still beacon what we have? No: the backend
+      // rejects incomplete payloads, so skip the request entirely.
+      return;
+    }
+    var beaconUrl = (CONFIG.apiBaseUrl || '') + '/api/payment/context';
+    try {
+      fetch(beaconUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          client_mac: normalizeMac(queryParams.clientMac) || queryParams.clientMac,
+          client_ip:  queryParams.clientIp || '',
+          ap_mac:     normalizeMac(queryParams.apMac) || queryParams.apMac,
+          ssid_name:  queryParams.ssidName,
+          radio_id:   parseInt(queryParams.radioId, 10) || 0,
+        }),
+        // keepalive helps the beacon survive an immediate redirect
+        keepalive: true,
+      }).catch(function () { /* fire-and-forget — never surface beacon errors */ });
+    } catch (e) { /* ignore — beacon must never break page load */ }
+  }
+
+  // ===============================================================
   // INIT
   // ===============================================================
   function init() {
     // Parse Omada query params first (affects everything)
     parseQueryParams();
+
+    // Fire-and-forget context capture: on portal LANDING, beacon the
+    // controller context (client/AP MAC, SSID, radioId) to the backend so
+    // the later payment webhook can authorize this device via
+    // /hotspot/extPortal/auth even if the client is offline at payment
+    // time. Never blocks or breaks the portal UI — failures are silent
+    // here; the webhook fails loud (MISSING_PORTAL_CONTEXT) instead.
+    sendContextBeacon();
 
     // Apply brand theming
     applyTheming();

@@ -149,6 +149,21 @@ async function getSession(sessionId) {
     updatedAt: row.updated_at,
   };
 
+  // radioId is not stored on sessions (controller context lives in
+  // portal_client_context); enrich from there for resume/activate calls.
+  // Best-effort: a missing row defaults to radioId 0 (single-radio APs).
+  try {
+    const ctxRow = await db.getOne(
+      'SELECT radio_id FROM portal_client_context WHERE client_mac = ?',
+      [row.client_mac]
+    );
+    session.radioId = ctxRow && ctxRow.radio_id !== null && ctxRow.radio_id !== undefined
+      ? ctxRow.radio_id
+      : 0;
+  } catch (_) {
+    session.radioId = 0; // context table may not exist yet in legacy DBs
+  }
+
   // Check server-side expiration for active sessions
   if (session.state === 'active' && session.expiresAt) {
     const now = Date.now();
@@ -281,8 +296,8 @@ async function resumeSession(sessionId) {
       clientIp: session.clientIp,
       apMac: session.apMac,
       ssidName: session.ssidName,
-      username: username,
-      password: sessionId,
+      radioId: session.radioId || 0,
+      durationMinutes: Math.ceil(remaining / 60),
       sessionId,
     });
   } catch (err) {
@@ -430,8 +445,8 @@ async function activatePaidSession(sessionId, eventId, amount, webhookVoucherTyp
     clientIp:  session.clientIp,
     apMac:     session.apMac,
     ssidName:  session.ssidName,
-    username:  username,
-    password:  sessionId,
+    radioId:   session.radioId || 0,
+    durationMinutes: duration,
     sessionId: sessionId,
   });
 

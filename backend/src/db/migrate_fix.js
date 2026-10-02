@@ -190,6 +190,26 @@ async function fixMissingColumns() {
   } catch (err) {
     console.warn('[migrate_fix] Vouchers table migration skipped:', err.message);
   }
+
+  // --- Portal client context table (new — ensure it exists on old DBs) ---
+  try {
+    const createSql = `
+      CREATE TABLE IF NOT EXISTS portal_client_context (
+          client_mac  VARCHAR(32) PRIMARY KEY,
+          client_ip   VARCHAR(45),
+          ap_mac      VARCHAR(32) NOT NULL,
+          ssid_name   VARCHAR(64) NOT NULL,
+          radio_id    INTEGER NOT NULL DEFAULT 0,
+          site        VARCHAR(64) NOT NULL DEFAULT 'Default',
+          seen_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`;
+    await db.exec(createSql);
+    console.log('[migrate_fix] portal_client_context table ready.');
+  } catch (err) {
+    console.warn('[migrate_fix] portal_client_context creation skipped:', err.message);
+  }
 }
 
 // Allow running standalone
