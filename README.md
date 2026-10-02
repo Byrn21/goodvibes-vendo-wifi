@@ -153,10 +153,11 @@ const CONFIG = {
   // === Voucher Validation (frontend hints only; backend enforces) ===
   voucher: {
     required: true,
-    minLength: 8,
-    maxLength: 16,
-    pattern: /^[A-Z0-9]+$/i,
-    patternHint: 'Letters and numbers only, 8–16 characters',
+    // RULE: exactly 6 numeric digits (matches backend/src/utils/voucher-code.js).
+    minLength: 6,
+    maxLength: 6,
+    pattern: /^\d{6}$/,
+    patternHint: 'Voucher code must be exactly 6 digits.',
   },
 
   // === Redirect ===
@@ -311,7 +312,7 @@ Authenticate a client via Omada.
 **Request:**
 ```json
 {
-  "voucher": "WIFI-ABCD-1234",
+  "voucher": "123456",
   "clientMac": "aa:bb:cc:dd:ee:ff",
   "clientIp": "192.168.1.105",
   "apMac": "00:11:22:33:44:55",

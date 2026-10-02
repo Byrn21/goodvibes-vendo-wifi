@@ -1,4 +1,4 @@
-﻿/**
+/**
  * config.js â€” Omada Captive Portal Frontend Configuration
  *
  * Copy this file to config/config.js (keep config.example.js as a template).
@@ -80,11 +80,11 @@
     // ==============================================================
     voucher: {
       required: true,
-      minLength: 8,
-      maxLength: 16,
-      // Allow letters, numbers, and common voucher separators
-      pattern: /^[A-Z0-9]+$/i,
-      patternHint: 'Letters and numbers only, 8â€“16 characters',
+      // RULE: exactly 6 numeric digits (matches backend/src/utils/voucher-code.js).
+      minLength: 6,
+      maxLength: 6,
+      pattern: /^\d{6}$/,
+      patternHint: 'Voucher code must be exactly 6 digits.',
     },
 
     // ==============================================================

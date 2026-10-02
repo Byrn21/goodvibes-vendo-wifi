@@ -58,58 +58,89 @@ describe('Query Parameter Parsing', () => {
 });
 
 describe('Voucher Validation', () => {
-  function validateVoucher(code, opts) {
-    var v = opts || {};
-    var minLen = v.minLength || 1;
-    var maxLen = v.maxLength || 32;
-    var pattern = v.pattern || /^[A-Z0-9\-]+$/i;
-    if (!code || !code.trim()) return { ok: false, message: 'Enter your voucher code.' };
-    var trimmed = code.trim();
-    if (trimmed.length < minLen) return { ok: false, message: 'Too short.' };
-    if (trimmed.length > maxLen) return { ok: false, message: 'Too long.' };
-    if (pattern && !pattern.test(trimmed)) return { ok: false, message: 'Invalid format.' };
-    return { ok: true, value: trimmed };
+  // Mirror of assets/portal.js validateVoucher (6-digit numeric rule)
+  function sanitizeVoucherCode(raw) {
+    return String(raw == null ? '' : raw).trim().replace(/\D/g, '');
   }
 
-  test('accepts valid alphanumeric voucher', () => {
-    var r = validateVoucher('WIFI-ABCD-1234', { pattern: /^[A-Z0-9\-]+$/i, minLength: 4, maxLength: 32 });
+  function validateVoucher(code, opts) {
+    var v = opts || {};
+    var MSG = 'Voucher code must be exactly 6 digits.';
+    if (!code || !code.trim()) return { ok: false, message: 'Enter your voucher code.' };
+    var digits = sanitizeVoucherCode(code);
+    if (!digits) return { ok: false, message: 'Enter your voucher code.' };
+    var pattern = v.pattern || /^\d{6}$/;
+    if (!new RegExp(pattern).test(digits)) {
+      return { ok: false, message: v.patternHint || MSG };
+    }
+    if (v.minLength && digits.length < v.minLength) {
+      return { ok: false, message: v.patternHint || MSG };
+    }
+    if (v.maxLength && digits.length > v.maxLength) {
+      return { ok: false, message: v.patternHint || MSG };
+    }
+    return { ok: true, value: digits };
+  }
+
+  var SIX_DIGIT_OPTS = {
+    minLength: 6,
+    maxLength: 6,
+    pattern: /^\d{6}$/,
+    patternHint: 'Voucher code must be exactly 6 digits.',
+  };
+
+  test('accepts valid 6-digit voucher', () => {
+    var r = validateVoucher('123456', SIX_DIGIT_OPTS);
     expect(r.ok).toBe(true);
-    expect(r.value).toBe('WIFI-ABCD-1234');
+    expect(r.value).toBe('123456');
   });
 
   test('rejects empty voucher', () => {
-    var r = validateVoucher('', {});
+    var r = validateVoucher('', SIX_DIGIT_OPTS);
     expect(r.ok).toBe(false);
     expect(r.message).toBe('Enter your voucher code.');
   });
 
   test('rejects whitespace-only voucher', () => {
-    var r = validateVoucher('   ', {});
+    var r = validateVoucher('   ', SIX_DIGIT_OPTS);
     expect(r.ok).toBe(false);
   });
 
-  test('rejects voucher below minLength', () => {
-    var r = validateVoucher('ABC', { minLength: 8 });
+  test('rejects 5-digit voucher (too short)', () => {
+    var r = validateVoucher('12345', SIX_DIGIT_OPTS);
     expect(r.ok).toBe(false);
-    expect(r.message).toBe('Too short.');
+    expect(r.message).toBe('Voucher code must be exactly 6 digits.');
   });
 
-  test('rejects voucher above maxLength', () => {
-    var r = validateVoucher('A'.repeat(33), { maxLength: 32 });
+  test('rejects 8-digit voucher (too long)', () => {
+    var r = validateVoucher('12345678', SIX_DIGIT_OPTS);
     expect(r.ok).toBe(false);
-    expect(r.message).toBe('Too long.');
+    expect(r.message).toBe('Voucher code must be exactly 6 digits.');
   });
 
-  test('rejects invalid characters with custom pattern', () => {
-    var r = validateVoucher('WI-FI@INVALID!', { pattern: /^[A-Z0-9\-]+$/i });
+  test('rejects letter-containing voucher', () => {
+    var r = validateVoucher('WIFI-ABCD-1234', SIX_DIGIT_OPTS);
     expect(r.ok).toBe(false);
-    expect(r.message).toBe('Invalid format.');
+  });
+
+  test('sanitizes pasted "123-456" and "123 456" to 123456', () => {
+    var r1 = validateVoucher('123-456', SIX_DIGIT_OPTS);
+    expect(r1.ok).toBe(true);
+    expect(r1.value).toBe('123456');
+    var r2 = validateVoucher('123 456', SIX_DIGIT_OPTS);
+    expect(r2.ok).toBe(true);
+    expect(r2.value).toBe('123456');
   });
 
   test('trims whitespace before validation', () => {
-    var r = validateVoucher('  WIFI-ABCD-1234  ', { pattern: /^[A-Z0-9\-]+$/i, minLength: 4 });
+    var r = validateVoucher('  123456  ', SIX_DIGIT_OPTS);
     expect(r.ok).toBe(true);
-    expect(r.value).toBe('WIFI-ABCD-1234');
+    expect(r.value).toBe('123456');
+  });
+
+  test('non-digit-only input (e.g. "ABCDEF") is rejected', () => {
+    var r = validateVoucher('ABCDEF', SIX_DIGIT_OPTS);
+    expect(r.ok).toBe(false);
   });
 });
 

@@ -40,12 +40,14 @@
     // ==============================================================
     // VOUCHER VALIDATION
     // ==============================================================
+    // RULE: exactly 6 numeric digits (matches backend/src/utils/voucher-code.js).
+    // Keep all three in sync if this ever changes.
     voucher: {
       required: true,
-      minLength: 8,
-      maxLength: 16,
-      pattern: /^[A-Z0-9\-]+$/i,
-      patternHint: 'Letters, numbers, and dashes only, 8â€“16 characters',
+      minLength: 6,
+      maxLength: 6,
+      pattern: /^\d{6}$/,
+      patternHint: 'Voucher code must be exactly 6 digits.',
     },
 
     // ==============================================================

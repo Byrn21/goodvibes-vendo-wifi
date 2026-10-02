@@ -24,10 +24,11 @@
     apiBaseUrl: '',
     voucher: {
       required: true,
-      minLength: 4,
-      maxLength: 32,
-      pattern: /^[A-Z0-9\-]+$/i,
-      patternHint: 'Letters, numbers, and dashes',
+      // RULE: exactly 6 numeric digits (matches backend/src/utils/voucher-code.js).
+      minLength: 6,
+      maxLength: 6,
+      pattern: /^\d{6}$/,
+      patternHint: 'Voucher code must be exactly 6 digits.',
     },
     allowedRedirectDomains: [],
     defaultRedirectUrl: '',
@@ -193,20 +194,33 @@
   // ===============================================================
   // VALIDATION
   // ===============================================================
+  // Shared rule: exactly 6 numeric digits (mirrors backend/src/utils/voucher-code.js).
+  // Codes are sanitized (non-digits stripped) as the user types AND here,
+  // so a pasted "123 456" or "123-456" becomes "123456" before validation.
+  var VOUCHER_CODE_MESSAGE = 'Voucher code must be exactly 6 digits.';
+
+  function sanitizeVoucherCode(raw) {
+    return String(raw == null ? '' : raw).trim().replace(/\D/g, '');
+  }
+
   function validateVoucher(code) {
     var v = CONFIG.voucher || {};
     if (!code || !code.trim()) return { ok: false, message: 'Enter your voucher code.' };
-    var trimmed = code.trim();
-    if (v.minLength && trimmed.length < v.minLength) {
-      return { ok: false, message: 'Voucher code is too short (min ' + v.minLength + ' characters).' };
+    var digits = sanitizeVoucherCode(code);
+    if (!digits) return { ok: false, message: 'Enter your voucher code.' };
+    // Single shared rule: exactly 6 numeric digits. minLength/maxLength are
+    // kept as a legacy fallback so older config files still behave.
+    var pattern = v.pattern || /^\d{6}$/;
+    if (!new RegExp(pattern).test(digits)) {
+      return { ok: false, message: v.patternHint || VOUCHER_CODE_MESSAGE };
     }
-    if (v.maxLength && trimmed.length > v.maxLength) {
-      return { ok: false, message: 'Voucher code is too long (max ' + v.maxLength + ' characters).' };
+    if (v.minLength && digits.length < v.minLength) {
+      return { ok: false, message: v.patternHint || VOUCHER_CODE_MESSAGE };
     }
-    if (v.pattern && !new RegExp(v.pattern).test(trimmed)) {
-      return { ok: false, message: v.patternHint || 'Invalid voucher format.' };
+    if (v.maxLength && digits.length > v.maxLength) {
+      return { ok: false, message: v.patternHint || VOUCHER_CODE_MESSAGE };
     }
-    return { ok: true, value: trimmed };
+    return { ok: true, value: digits };
   }
 
   function validateTerms(checked) {
@@ -556,17 +570,33 @@
     var input = $('voucher-input');
     if (!input) return;
 
-    // Clear error as user types
+    // Clear error as user types, and strip non-digits live so pasting
+    // "123 456" or "123-456" becomes "123456" immediately.
     input.addEventListener('input', function () {
+      var cleaned = sanitizeVoucherCode(input.value);
+      if (cleaned !== input.value) {
+        input.value = cleaned;
+      }
       setError('voucher-input', '');
       setFormError('');
     });
 
-    // Upper-case formatting (visual only; actual validation uses trimmed value)
+    // Also sanitize pasted content (paste fires before input in some browsers)
+    input.addEventListener('paste', function () {
+      setTimeout(function () {
+        var cleaned = sanitizeVoucherCode(input.value);
+        if (cleaned !== input.value) {
+          input.value = cleaned;
+        }
+        setError('voucher-input', '');
+        setFormError('');
+      }, 0);
+    });
+
+    // Trim and strip non-digits on blur
     input.addEventListener('blur', function () {
       if (input.value) {
-        // Don't auto-modify in case the code is case-sensitive — just trim whitespace
-        input.value = input.value.trim();
+        input.value = sanitizeVoucherCode(input.value);
       }
     });
 

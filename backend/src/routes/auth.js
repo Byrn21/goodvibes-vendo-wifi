@@ -13,6 +13,7 @@ const express = require('express');
 const router = express.Router();
 const omadaService = require('../services/omada');
 const { validateVoucher, recordSession } = require('../services/session');
+const { normalizeVoucherCode, validateVoucherCodeFormat } = require('../utils/voucher-code');
 const { v4: uuidv4 } = require('uuid');
 
 // POST /api/auth
@@ -32,6 +33,20 @@ router.post('/', async (req, res, next) => {
     // ── Input validation ────────────────────────────────────
     if (!voucher || typeof voucher !== 'string' || !voucher.trim()) {
       return res.status(400).json({ success: false, error: 'Voucher is required.', code: 'INVALID_INPUT' });
+    }
+
+    // ── Voucher code format: exactly 6 numeric digits ───────
+    // Normalizes ("123 456" -> "123456") then enforces ^\d{6}$ so an
+    // 8-digit or non-numeric code is rejected with 400 even if the
+    // frontend validation is bypassed.
+    const normalizedVoucher = normalizeVoucherCode(voucher);
+    const formatResult = validateVoucherCodeFormat(normalizedVoucher);
+    if (!formatResult.ok) {
+      return res.status(400).json({
+        success: false,
+        error: formatResult.message,
+        code: 'INVALID_INPUT',
+      });
     }
 
     // MAC address normalization and validation
@@ -58,7 +73,7 @@ router.post('/', async (req, res, next) => {
     const sessionId = 'sess_' + uuidv4().replace(/-/g, '').slice(0, 16);
 
     // ── Free voucher validation ─────────────────────────────
-    const voucherResult = await validateVoucher(voucher.trim(), normalizedMac);
+    const voucherResult = await validateVoucher(normalizedVoucher, normalizedMac);
     if (!voucherResult.valid) {
       return res.status(401).json({
         success: false,
@@ -78,8 +93,8 @@ router.post('/', async (req, res, next) => {
         clientIp: clientIp || '',
         apMac: apMac || '',
         ssidName: ssidName || '',
-        username: voucherTypeResolved === 'premium' ? 'prem_' + voucher.trim() : voucher.trim(),
-        password: voucher.trim(),
+        username: voucherTypeResolved === 'premium' ? 'prem_' + normalizedVoucher : normalizedVoucher,
+        password: normalizedVoucher,
         sessionId,
       });
     } catch (omadaErr) {
@@ -105,7 +120,7 @@ router.post('/', async (req, res, next) => {
       apMac: apMac || '',
       ssidName: ssidName || '',
       duration,        // minutes
-      voucherUsed: voucher.trim(),
+      voucherUsed: normalizedVoucher,
       voucherType: voucherTypeResolved,
     });
 

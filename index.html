@@ -233,13 +233,13 @@
                 id="voucher-input"
                 name="voucher"
                 class="form-input"
-                placeholder="e.g. WIFI-ABCD-1234"
+                placeholder="e.g. 123456"
                 autocomplete="off"
-                autocapitalize="characters"
                 spellcheck="false"
-                minlength="1"
-                maxlength="32"
-                inputmode="text"
+                minlength="6"
+                maxlength="6"
+                pattern="[0-9]{6}"
+                inputmode="numeric"
                 required
                 aria-required="true"
                 aria-describedby="voucher-hint voucher-error"
@@ -255,7 +255,7 @@
                 </svg>
               </button>
             </div>
-            <p id="voucher-hint" class="form-hint" aria-live="polite"></p>
+            <p id="voucher-hint" class="form-hint" aria-live="polite">Your voucher code is the 6-digit number (e.g. 123456).</p>
             <p id="voucher-error" class="form-error hidden" role="alert"></p>
           </div>
 
