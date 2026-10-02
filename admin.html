@@ -98,7 +98,11 @@
 
       <!-- Vouchers Section -->
       <div class="admin-card content-section" id="section-vouchers">
-        <h2>Vouchers</h2>
+        <div class="admin-card--header">
+          <h2 class="admin-card--title">Vouchers</h2>
+          <button type="button" class="btn btn--danger" id="btn-delete-all" disabled>Delete All Vouchers</button>
+        </div>
+        <div id="delete-all-msg"></div>
         <div id="tab-vouchers"></div>
       </div>
 
@@ -115,6 +119,20 @@
       </div>
     </main>
   </div>
+
+    <!-- Delete All Vouchers confirmation modal -->
+    <div class="admin-modal-overlay" id="delete-all-overlay" hidden>
+      <div class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="delete-all-title">
+        <h3 id="delete-all-title">Delete All Vouchers</h3>
+        <p id="delete-all-text"></p>
+        <p class="admin-modal__warn">This action cannot be undone.</p>
+        <div id="delete-all-error" class="admin-modal__error" hidden></div>
+        <div class="admin-modal__actions">
+          <button type="button" class="btn btn--secondary" id="delete-all-cancel">Cancel</button>
+          <button type="button" class="btn btn--danger" id="delete-all-confirm">Delete All</button>
+        </div>
+      </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="config/config.js"></script>
@@ -141,6 +159,13 @@
         sidebarNav:     document.getElementById('admin-sidebar-nav'),
         overlay:        document.getElementById('admin-overlay'),
         adminUsername: document.getElementById('admin-username'),
+        btnDeleteAll:   document.getElementById('btn-delete-all'),
+        deleteAllMsg:   document.getElementById('delete-all-msg'),
+        deleteAllOverlay: document.getElementById('delete-all-overlay'),
+        deleteAllText:  document.getElementById('delete-all-text'),
+        deleteAllError: document.getElementById('delete-all-error'),
+        deleteAllCancel: document.getElementById('delete-all-cancel'),
+        deleteAllConfirm: document.getElementById('delete-all-confirm'),
       };
 
       var sidebarLinks = document.querySelectorAll('.admin-sidebar__nav-link');
@@ -277,9 +302,85 @@
             if (!res.ok) throw new Error((res.data && res.data.error) || 'Failed to load vouchers');
             var vouchers = res.data.vouchers || [];
             els.tabVouchers.innerHTML = renderVouchers(vouchers);
+            updateDeleteAllState(vouchers.length);
           })
           .catch(function (err) {
             els.tabVouchers.innerHTML = '<p class="error-msg">' + err.message + '</p>';
+            updateDeleteAllState(0);
+          });
+      }
+
+      // Enable the Delete All button only when there is something to delete
+      function updateDeleteAllState(count) {
+        if (els.btnDeleteAll) {
+          els.btnDeleteAll.disabled = count === 0;
+          els.btnDeleteAll.textContent = count > 0
+            ? 'Delete All Vouchers (' + count + ')'
+            : 'Delete All Vouchers';
+        }
+      }
+
+      // ---- Delete All Vouchers: confirmation modal ----
+      function openDeleteAllModal(count) {
+        if (!els.deleteAllOverlay) return;
+        if (els.deleteAllText) {
+          els.deleteAllText.textContent = 'This will permanently delete ' + count +
+            ' voucher' + (count === 1 ? '' : 's') + '.';
+        }
+        if (els.deleteAllError) {
+          els.deleteAllError.hidden = true;
+          els.deleteAllError.textContent = '';
+        }
+        if (els.deleteAllConfirm) {
+          els.deleteAllConfirm.disabled = false;
+          els.deleteAllConfirm.textContent = 'Delete All';
+        }
+        els.deleteAllOverlay.hidden = false;
+        if (els.deleteAllCancel) els.deleteAllCancel.focus();
+      }
+
+      function closeDeleteAllModal() {
+        if (els.deleteAllOverlay) els.deleteAllOverlay.hidden = true;
+      }
+
+      function deleteAllVouchers() {
+        if (!els.deleteAllConfirm || els.deleteAllConfirm.disabled) return;
+        // Loading state - prevents double clicks while the request runs
+        els.deleteAllConfirm.disabled = true;
+        els.deleteAllConfirm.textContent = 'Deletingâ€¦';
+        if (els.deleteAllError) {
+          els.deleteAllError.hidden = true;
+        }
+        api('/api/admin/vouchers/delete-all', { method: 'POST' })
+          .then(function (res) {
+            if (res.ok) {
+              closeDeleteAllModal();
+              if (els.deleteAllMsg) {
+                els.deleteAllMsg.innerHTML = '<p class="success-msg">' + escapeHtml(
+                  (res.data && res.data.message) ||
+                  'All vouchers deleted. IDs will restart from 1 on the next import.'
+                ) + '</p>';
+              }
+              loadVouchers();
+              loadDashboard();
+            } else {
+              // Show the specific error returned by the backend, dismissible
+              els.deleteAllConfirm.disabled = false;
+              els.deleteAllConfirm.textContent = 'Delete All';
+              if (els.deleteAllError) {
+                els.deleteAllError.textContent = (res.data && res.data.error) ||
+                  'Failed to delete all vouchers. Please try again.';
+                els.deleteAllError.hidden = false;
+              }
+            }
+          })
+          .catch(function (err) {
+            els.deleteAllConfirm.disabled = false;
+            els.deleteAllConfirm.textContent = 'Delete All';
+            if (els.deleteAllError) {
+              els.deleteAllError.textContent = 'Network error: ' + err.message;
+              els.deleteAllError.hidden = false;
+            }
           });
       }
 
@@ -291,9 +392,10 @@
         var rows = vouchers.map(function (item, idx) {
           var stateClass = item.used_at ? 'used' : (item.state || 'active');
           var stateLabel = item.used_at ? 'Used' : (item.state || 'active');
-          return '<tr>' +
+          // ID is kept only as data-voucher-id (never shown) so the single
+          // Delete button still works after the raw ID column was removed.
+          return '<tr data-id="' + (item.id || 0) + '">' +
             '<td>' + (idx + 1) + '</td>' +
-            '<td>' + (item.id || '&mdash;') + '</td>' +
             '<td>' + escapeHtml(item.code) + '</td>' +
             '<td><span class="badge badge-' + (item.type || 'standard') + '">' + escapeHtml(item.type || 'standard') + '</span></td>' +
             '<td>' + (item.duration_minutes || 0) + ' min</td>' +
@@ -302,7 +404,7 @@
             '<td><button type="button" class="btn btn--danger btn--delete-voucher" data-voucher-id="' + (item.id || 0) + '">Delete</button></td>' +
             '</tr>';
         }).join('');
-        return '<table><thead><tr><th>#</th><th>ID</th><th>Code</th><th>Type</th><th>Duration</th><th>Price</th><th>State</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
+        return '<table><thead><tr><th>#</th><th>Code</th><th>Type</th><th>Duration</th><th>Price</th><th>State</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
       }
 
       // deleteVoucher with explicit button parameter &mdash; no reliance on global `event` object
@@ -659,6 +761,33 @@
         if (btn) {
           var id = btn.getAttribute('data-voucher-id');
           deleteVoucher(id, btn);
+        }
+      });
+
+      // Delete All Vouchers wiring
+      if (els.btnDeleteAll) {
+        els.btnDeleteAll.addEventListener('click', function () {
+          // Count vouchers currently shown in the table
+          var rows = els.tabVouchers ? els.tabVouchers.querySelectorAll('tbody tr').length : 0;
+          if (rows > 0) openDeleteAllModal(rows);
+        });
+      }
+      if (els.deleteAllCancel) {
+        els.deleteAllCancel.addEventListener('click', closeDeleteAllModal);
+      }
+      if (els.deleteAllConfirm) {
+        els.deleteAllConfirm.addEventListener('click', deleteAllVouchers);
+      }
+      // Click outside the modal (on the dimmed overlay) closes it
+      if (els.deleteAllOverlay) {
+        els.deleteAllOverlay.addEventListener('click', function (e) {
+          if (e.target === els.deleteAllOverlay) closeDeleteAllModal();
+        });
+      }
+      // Escape closes the modal
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && els.deleteAllOverlay && !els.deleteAllOverlay.hidden) {
+          closeDeleteAllModal();
         }
       });
 

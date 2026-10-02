@@ -225,16 +225,37 @@ router.delete('/vouchers/:id', async (req, res, next) => {
 
 // Delete ALL vouchers and reset the ID sequence (one-shot cleanup endpoint).
 // Sessions are linked to vouchers by code, not ID, so this never breaks them.
+// A failure here returns a specific, non-leaking message (never the generic
+// "An internal error occurred." from the global handler) so sequence-reset
+// problems on PostgreSQL are diagnosable.
 router.post('/vouchers/delete-all', async (req, res, next) => {
+  const db = getDb();
   try {
-    const db = getDb();
     const countRow = await db.getOne('SELECT COUNT(*) AS count FROM vouchers');
     const before = parseInt(countRow?.count || 0, 10);
 
     if (before > 0) {
       await db.run('DELETE FROM vouchers');
     }
-    const idsReset = await resetVoucherIdSequence(db);
+    let idsReset = false;
+    try {
+      idsReset = await resetVoucherIdSequence(db);
+    } catch (seqErr) {
+      console.error('[admin] Voucher ID sequence reset failed:', seqErr.message);
+      // Rows are already deleted - report success but flag the sequence problem.
+      const refRow = await db.getOne('SELECT COUNT(DISTINCT voucher_used) AS count FROM sessions WHERE voucher_used IS NOT NULL');
+      const sessionRefs = parseInt(refRow?.count || 0, 10);
+      return res.json({
+        success: true,
+        deleted: before,
+        idsReset: false,
+        message: `Deleted ${before} voucher(s). ` +
+          'WARNING: the ID sequence could NOT be reset (see server logs) - the next import may not start at ID 1.',
+        note: sessionRefs > 0
+          ? `${sessionRefs} session record(s) reference deleted voucher codes. Sessions are linked by code, not by ID, so they remain valid.`
+          : undefined,
+      });
+    }
 
     const refRow = await db.getOne('SELECT COUNT(DISTINCT voucher_used) AS count FROM sessions WHERE voucher_used IS NOT NULL');
     const sessionRefs = parseInt(refRow?.count || 0, 10);
@@ -252,7 +273,15 @@ router.post('/vouchers/delete-all', async (req, res, next) => {
         : undefined,
     });
   } catch (err) {
-    next(err);
+    console.error('[admin] delete-all failed:', err.message);
+    // Send a specific error instead of falling through to the generic handler.
+    // 503 signals a database-level problem; no partial state is exposed.
+    return res.status(503).json({
+      success: false,
+      error: 'Failed to delete all vouchers: a database error occurred (' +
+        (err.code || err.message || 'unknown').slice(0, 120) +
+        '). No vouchers were deleted or the deletion was incomplete - check the server logs and try again.',
+    });
   }
 });
 
