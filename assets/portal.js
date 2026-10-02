@@ -604,7 +604,7 @@
   // ---------------------------------------------------------------
   function formatPrice(amount) {
     // Amount in smallest currency unit (e.g., centavos for PHP)
-    var pesos = (amount / 100).toFixed(2);
+    var pesos = (amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return '₱' + pesos;
   }
 

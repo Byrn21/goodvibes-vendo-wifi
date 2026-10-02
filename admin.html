@@ -288,10 +288,11 @@
         if (!vouchers.length) {
           return '<p class="muted">No vouchers found.</p>';
         }
-        var rows = vouchers.map(function (item) {
+        var rows = vouchers.map(function (item, idx) {
           var stateClass = item.used_at ? 'used' : (item.state || 'active');
           var stateLabel = item.used_at ? 'Used' : (item.state || 'active');
           return '<tr>' +
+            '<td>' + (idx + 1) + '</td>' +
             '<td>' + (item.id || '&mdash;') + '</td>' +
             '<td>' + escapeHtml(item.code) + '</td>' +
             '<td><span class="badge badge-' + (item.type || 'standard') + '">' + escapeHtml(item.type || 'standard') + '</span></td>' +
@@ -301,7 +302,7 @@
             '<td><button type="button" class="btn btn--danger btn--delete-voucher" data-voucher-id="' + (item.id || 0) + '">Delete</button></td>' +
             '</tr>';
         }).join('');
-        return '<table><thead><tr><th>ID</th><th>Code</th><th>Type</th><th>Duration</th><th>Price</th><th>State</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
+        return '<table><thead><tr><th>#</th><th>ID</th><th>Code</th><th>Type</th><th>Duration</th><th>Price</th><th>State</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table>';
       }
 
       // deleteVoucher with explicit button parameter &mdash; no reliance on global `event` object
@@ -404,7 +405,8 @@
       }
 
       function formatPrice(amount) {
-        return '\u20b1' + (amount / 100).toFixed(2);
+        // amount is integer centavos - convert once, here
+        return '\u20b1' + (amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       }
 
       function formatDate(iso) {
@@ -574,7 +576,7 @@
                   stat('Active Sessions', s.activeSessions),
                   stat('Paused Sessions', s.pausedSessions),
                   stat('Premium Sessions', s.premiumSessions),
-                  stat('Total Revenue', '\u20b1' + (s.totalRevenue / 100).toFixed(2)),
+                  stat('Total Revenue', '\u20b1' + (s.totalRevenue / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
                 ].join('');
               }
 

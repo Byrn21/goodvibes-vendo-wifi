@@ -22,6 +22,7 @@ const { v4: uuidv4 } = require('uuid');
 const router = express.Router();
 const { getDb } = require('../db/client');
 const { expireSession } = require('../services/session');
+const { parsePriceToCentavos } = require('../utils/price');
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
@@ -101,6 +102,9 @@ router.post('/vouchers', async (req, res, next) => {
     if (!durationMinutes || durationMinutes < 1) {
       return res.status(400).json({ success: false, error: 'durationMinutes is required and must be positive' });
     }
+    if (price !== undefined && price !== null && (!Number.isInteger(price) || price < 0)) {
+      return res.status(400).json({ success: false, error: 'price must be a non-negative integer number of centavos (50.00 pesos = 5000)' });
+    }
 
     const db = getDb();
     const created = [];
@@ -170,7 +174,32 @@ router.put('/vouchers/:id', async (req, res, next) => {
   }
 });
 
-// Delete a voucher
+// Reset the vouchers ID sequence so the next insert starts at 1.
+// SAFE: sessions reference vouchers by CODE (sessions.voucher_used) and no
+// foreign key references vouchers.id, so resetting IDs never breaks links.
+async function resetVoucherIdSequence(db) {
+  try {
+    if (db._driver === 'pg') {
+      // PostgreSQL: schema converts AUTOINCREMENT to an identity column
+      await db.run('ALTER TABLE vouchers ALTER COLUMN id RESTART WITH 1');
+      return true;
+    }
+    // SQLite: the AUTOINCREMENT counter lives in sqlite_sequence
+    const seqTable = await db.getOne(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_sequence'"
+    );
+    if (!seqTable) return true; // fresh table - sequence already starts at 1
+    await db.run("DELETE FROM sqlite_sequence WHERE name = 'vouchers'");
+    return true;
+  } catch (err) {
+    console.error('[admin] Could not reset voucher ID sequence:', err.message);
+    return false;
+  }
+}
+
+// Delete a voucher. When this empties the table, the auto-increment sequence
+// is reset so the next import starts again at ID 1. Partial deletes never
+// renumber the remaining rows.
 router.delete('/vouchers/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -179,7 +208,49 @@ router.delete('/vouchers/:id', async (req, res, next) => {
     if (result.rowCount === 0) {
       return res.status(404).json({ success: false, error: 'Voucher not found' });
     }
-    res.json({ success: true });
+    const remaining = await db.getOne('SELECT COUNT(*) AS count FROM vouchers');
+    const isEmpty = !remaining || parseInt(remaining.count, 10) === 0;
+    const idsReset = isEmpty ? await resetVoucherIdSequence(db) : false;
+    res.json({
+      success: true,
+      idsReset,
+      message: idsReset
+        ? 'Voucher deleted. Table is now empty - ID sequence reset (next voucher starts at ID 1).'
+        : undefined,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delete ALL vouchers and reset the ID sequence (one-shot cleanup endpoint).
+// Sessions are linked to vouchers by code, not ID, so this never breaks them.
+router.post('/vouchers/delete-all', async (req, res, next) => {
+  try {
+    const db = getDb();
+    const countRow = await db.getOne('SELECT COUNT(*) AS count FROM vouchers');
+    const before = parseInt(countRow?.count || 0, 10);
+
+    if (before > 0) {
+      await db.run('DELETE FROM vouchers');
+    }
+    const idsReset = await resetVoucherIdSequence(db);
+
+    const refRow = await db.getOne('SELECT COUNT(DISTINCT voucher_used) AS count FROM sessions WHERE voucher_used IS NOT NULL');
+    const sessionRefs = parseInt(refRow?.count || 0, 10);
+
+    res.json({
+      success: true,
+      deleted: before,
+      idsReset,
+      message: `Deleted ${before} voucher(s). ` +
+        (idsReset
+          ? 'ID sequence reset - the next import starts again at ID 1.'
+          : 'WARNING: the ID sequence could NOT be reset (see server logs).'),
+      note: sessionRefs > 0
+        ? `${sessionRefs} session record(s) reference deleted voucher codes. Sessions are linked by code, not by ID, so they remain valid - no foreign key errors occurred.`
+        : undefined,
+    });
   } catch (err) {
     next(err);
   }
@@ -317,23 +388,22 @@ router.post('/vouchers/import', upload.single('file'), async (req, res, next) =>
         errors.push(`Row ${excelRow}: column "Duration" has invalid value "${durationStr}" (expected a positive whole number of minutes)`);
       }
 
-      // --- Price: strip currency symbol/commas/spaces, parse as float, store as integer ---
+      // --- Price: one shared parser, human format -> integer centavos ---
+      // STORAGE RULE: vouchers.price is INTEGER centavos (₱50.00 = 5000).
       const rawPrice = row.Price;
       const priceStr = rawPrice === undefined || rawPrice === null ? '' : String(rawPrice).trim();
-      let price = null;
-      if (priceStr !== '') {
-        const cleanedPrice = priceStr.replace(/[₱, ]/g, '');
-        const parsedPrice = parseFloat(cleanedPrice);
-        if (isNaN(parsedPrice)) {
-          errors.push(`Row ${excelRow}: column "Price" has invalid value "${priceStr}" (expected a number)`);
-        } else {
-          // price column is INTEGER (centavos) — round to avoid float artifacts
-          price = Math.round(parsedPrice);
-        }
+      const priceResult = parsePriceToCentavos(rawPrice);
+      if (!priceResult.ok) {
+        const reasons = {
+          empty: 'a price is required (e.g. ₱50.00)',
+          negative: 'price cannot be negative',
+          invalid: 'expected a price like 50, 50.50, ₱50.00, or PHP 1,250.00',
+          too_large: 'price is too large',
+        };
+        errors.push(`Row ${excelRow}: column "Price" has invalid value "${priceStr}" (${reasons[priceResult.reason]})`);
       }
-
       if (errors.length === 0) {
-        validRows.push({ code: codeStr, type: typeStr, duration: parsedDuration, price });
+        validRows.push({ code: codeStr, type: typeStr, duration: parsedDuration, price: priceResult.ok ? priceResult.centavos : null });
       }
     }
 

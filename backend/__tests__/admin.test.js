@@ -242,9 +242,15 @@ describe('POST /api/admin/vouchers/import — Voucher Import', () => {
   const XLSX = require('xlsx');
 
   function buildCsv(headers, rows) {
-    const lines = [headers.join(',')];
+    // RFC 4180: quote any field that contains a comma so values like
+    // "₱1,250.50" survive as a single cell (real spreadsheets do this).
+    const esc = v => {
+      const s = String(v == null ? '' : v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const lines = [headers.map(esc).join(',')];
     rows.forEach(row => {
-      lines.push(headers.map(h => String(row[h] || '')).join(','));
+      lines.push(headers.map(h => esc(row[h])).join(','));
     });
     return Buffer.from(lines.join('\n'), 'utf8');
   }
@@ -377,5 +383,131 @@ describe('POST /api/admin/vouchers/import — Voucher Import', () => {
 
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
+  });
+
+  test('stores peso formats as exact centavos: ₱50.00->5000, 100->10000, ₱1,250.50->125050, PHP 75->7500', async () => {
+    const csv = buildCsv(
+      ['ID', 'Code', 'Type', 'Duration', 'Price'],
+      [
+        { ID: '', Code: '101010', Type: 'standard', Duration: 60, Price: '₱50.00' },
+        { ID: '', Code: '202020', Type: 'standard', Duration: 60, Price: '100' },
+        { ID: '', Code: '303030', Type: 'premium',  Duration: 60, Price: '₱1,250.50' },
+        { ID: '', Code: '404040', Type: 'standard', Duration: 60, Price: 'PHP 75' },
+      ]
+    );
+
+    const res = await request(app)
+      .post('/api/admin/vouchers/import')
+      .set('X-API-Key', VALID_KEY)
+      .attach('file', csv, 'peso.csv');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const list = await request(app)
+      .get('/api/admin/vouchers')
+      .set('X-API-Key', VALID_KEY);
+    const byCode = {};
+    list.body.vouchers.forEach(v => { byCode[v.code] = v.price; });
+    expect(byCode['101010']).toBe(5000);   // ₱50.00 -> 5000 centavos
+    expect(byCode['202020']).toBe(10000);  // 100 pesos -> 10000 centavos
+    expect(byCode['303030']).toBe(125050); // ₱1,250.50 -> 125050 centavos
+    expect(byCode['404040']).toBe(7500);   // PHP 75 -> 7500 centavos
+  });
+
+  test('rejects negative prices with a row-level error', async () => {
+    const csv = buildCsv(
+      ['ID', 'Code', 'Type', 'Duration', 'Price'],
+      [{ ID: 1, Code: '515151', Type: 'standard', Duration: 60, Price: '-5' }]
+    );
+    const res = await request(app)
+      .post('/api/admin/vouchers/import')
+      .set('X-API-Key', VALID_KEY)
+      .attach('file', csv, 'neg.csv');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('negative');
+  });
+
+  test('rejects empty prices with a row-level error', async () => {
+    const csv = buildCsv(
+      ['ID', 'Code', 'Type', 'Duration', 'Price'],
+      [{ ID: 1, Code: '525252', Type: 'standard', Duration: 60, Price: '' }]
+    );
+    const res = await request(app)
+      .post('/api/admin/vouchers/import')
+      .set('X-API-Key', VALID_KEY)
+      .attach('file', csv, 'emptyprice.csv');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('column "Price"');
+  });
+
+  test('delete-all resets the ID sequence so the next import starts at 1', async () => {
+    const del = await request(app)
+      .post('/api/admin/vouchers/delete-all')
+      .set('X-API-Key', VALID_KEY);
+    expect(del.status).toBe(200);
+    expect(del.body.success).toBe(true);
+    expect(del.body.idsReset).toBe(true);
+
+    const csv = buildCsv(
+      ['ID', 'Code', 'Type', 'Duration', 'Price'],
+      [
+        { ID: '', Code: '606060', Type: 'standard', Duration: 60, Price: '10' },
+        { ID: '', Code: '707070', Type: 'standard', Duration: 60, Price: '20' },
+      ]
+    );
+    const res = await request(app)
+      .post('/api/admin/vouchers/import')
+      .set('X-API-Key', VALID_KEY)
+      .attach('file', csv, 'afterreset.csv');
+    expect(res.status).toBe(200);
+
+    const list = await request(app)
+      .get('/api/admin/vouchers')
+      .set('X-API-Key', VALID_KEY);
+    const ids = list.body.vouchers.map(v => v.id).sort((a, b) => a - b);
+    expect(ids).toEqual([1, 2]);
+  });
+
+  test('partial deletes keep remaining IDs and never reset while the table is non-empty', async () => {
+    // beforeEach re-seeds 3 vouchers; capture their actual IDs first.
+    const before = await request(app)
+      .get('/api/admin/vouchers')
+      .set('X-API-Key', VALID_KEY);
+    const idsBefore = before.body.vouchers.map(v => v.id).sort((a, b) => a - b);
+    expect(idsBefore.length).toBe(3);
+
+    // Delete one of them — the remaining two must keep their original IDs
+    // and the sequence must NOT reset while the table is still non-empty.
+    const del = await request(app)
+      .delete('/api/admin/vouchers/' + idsBefore[1])
+      .set('X-API-Key', VALID_KEY);
+    expect(del.status).toBe(200);
+    expect(del.body.success).toBe(true);
+    expect(del.body.idsReset).toBe(false);
+
+    const after = await request(app)
+      .get('/api/admin/vouchers')
+      .set('X-API-Key', VALID_KEY);
+    const idsAfter = after.body.vouchers.map(v => v.id).sort((a, b) => a - b);
+    expect(idsAfter).toEqual([idsBefore[0], idsBefore[2]]);
+
+    // A NEW voucher gets the next sequential ID, not a reused one.
+    const csv = buildCsv(
+      ['ID', 'Code', 'Type', 'Duration', 'Price'],
+      [{ ID: '', Code: '808080', Type: 'standard', Duration: 60, Price: '30' }]
+    );
+    const res = await request(app)
+      .post('/api/admin/vouchers/import')
+      .set('X-API-Key', VALID_KEY)
+      .attach('file', csv, 'third.csv');
+    expect(res.status).toBe(200);
+
+    const final = await request(app)
+      .get('/api/admin/vouchers')
+      .set('X-API-Key', VALID_KEY);
+    const idsFinal = final.body.vouchers.map(v => v.id).sort((a, b) => a - b);
+    expect(idsFinal).toContain(Math.max(...idsBefore) + 1);
+    expect(idsFinal.length).toBe(3);
   });
 });
