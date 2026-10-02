@@ -523,7 +523,7 @@
                   result.innerHTML = '<p class="success-msg">' + (res.data.message || 'Import successful') + '</p>';
                   loadVouchers();
                 } else {
-                  result.innerHTML = '<p class="error-msg">' + ((res.data && res.data.error) || 'Import failed') + '</p>';
+                  result.innerHTML = '<p class="error-msg">' + escapeHtml((res.data && res.data.error) || 'Import failed') + '</p>';
                 }
               })
               .catch(function (err) {

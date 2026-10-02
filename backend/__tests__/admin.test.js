@@ -1,4 +1,4 @@
-/**
+﻿/**
  * __tests__/admin.test.js
  * Integration tests for admin.js DELETE /api/admin/vouchers/:id route
  *
@@ -326,7 +326,42 @@ describe('POST /api/admin/vouchers/import — Voucher Import', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
-    expect(res.body.error).toContain('Invalid ID format');
+    expect(res.body.error).toContain('column "ID" has invalid value');
+  });
+
+  test('accepts CSV with currency-formatted prices and blank IDs (reproduces the NaN price bug)', async () => {
+    const csv = buildCsv(
+      ['ID', 'Code', 'Type', 'Duration', 'Price'],
+      [{ ID: '', Code: '888888', Type: 'standard', Duration: 60, Price: '₱1,500.00' }]
+    );
+
+    const res = await request(app)
+      .post('/api/admin/vouchers/import')
+      .set('X-API-Key', VALID_KEY)
+      .attach('file', csv, 'currency.csv');
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.summary.inserted).toBe(1);
+    expect(res.body.summary.autoId).toBe(1);
+  });
+
+  test('returns 400 listing row, column and value when Price is not a number', async () => {
+    const csv = buildCsv(
+      ['ID', 'Code', 'Type', 'Duration', 'Price'],
+      [{ ID: 3, Code: '999999', Type: 'standard', Duration: 60, Price: 'abc' }]
+    );
+
+    const res = await request(app)
+      .post('/api/admin/vouchers/import')
+      .set('X-API-Key', VALID_KEY)
+      .attach('file', csv, 'bad_price.csv');
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toContain('Row 2');
+    expect(res.body.error).toContain('column "Price"');
+    expect(res.body.error).toContain('abc');
   });
 
   test('returns 401 without API key', async () => {
