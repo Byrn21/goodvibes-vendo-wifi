@@ -68,12 +68,19 @@ CREATE TABLE IF NOT EXISTS webhook_events (
     processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ref_no duplicate protection (payment reference numbers are unique per
--- transaction; SQLite enforces this via the UNIQUE column constraint above,
--- PostgreSQL via the partial unique index created in migrate_add_ref_no.js
-CREATE INDEX IF NOT EXISTS idx_sessions_provider   ON sessions(provider_session_id);
+-- ----------------------------------------------------------------
+-- ref_no duplicate protection
+-- Payment reference numbers are unique per transaction. SQLite
+-- enforces this via the UNIQUE column constraint in each CREATE
+-- TABLE above; PostgreSQL enforces it via the partial unique
+-- indexes below (which also cover fresh production databases).
+--
+-- NOTE: these indexes reference ref_no, which does not exist on
+-- legacy databases. migrate.js therefore runs column reconciliation
+-- (migrate_fix.js) BEFORE applying this file, so the columns always
+-- exist by the time these statements run.
+-- ----------------------------------------------------------------
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_ref_no ON sessions(ref_no) WHERE ref_no IS NOT NULL;
--- and replicated here for fresh production databases):
 CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_events_ref_no ON webhook_events(ref_no) WHERE ref_no IS NOT NULL;
 
 -- Indexes

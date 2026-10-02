@@ -54,7 +54,7 @@ async function createUniqueIndex(db, table, indexName) {
     await db.exec(sql);
     console.log(`[migrate_add_ref_no] unique index ${indexName} created`);
   } catch (err) {
-    if (err.code === '23505' || String(err.message || '').includes('already exists')) {
+    if (err.code === '42P07' || String(err.message || '').includes('already exists')) {
       console.log(`[migrate_add_ref_no] index ${indexName} already exists — skipping`);
       return;
     }

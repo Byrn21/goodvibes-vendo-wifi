@@ -1,13 +1,18 @@
-/**
+﻿/**
  * db/migrate_fix.js — Column-level migration for existing databases
  *
  * Ensures all columns defined in schema.sql exist on existing tables.
  * This is necessary because CREATE TABLE IF NOT EXISTS won't add
  * columns to tables that already exist in production databases.
  *
- * Columns are added using ALTER TABLE ... ADD COLUMN IF NOT EXISTS
- * (SQLite) / ALTER TABLE ... ADD COLUMN (PostgreSQL — IF NOT EXISTS
- * is handled via error suppression for duplicate column names).
+ * Columns are added using ALTER TABLE ... ADD COLUMN (plain types —
+ * see the constraint notes on the column lists below). Idempotent:
+ * a second run finds no missing columns and changes nothing.
+ *
+ * IMPORTANT: this runs BEFORE schema.sql is applied (see migrate.js)
+ * so that statements in schema.sql which reference newer columns
+ * (e.g. the ref_no partial unique indexes) never hit PostgreSQL
+ * 42703 "column does not exist".
  */
 
 const { getDb, closeDb } = require('./client');
@@ -15,6 +20,10 @@ const { getDb, closeDb } = require('./client');
 // Columns that may be missing from older production databases
 // Derived from schema.sql — sessions table
 const SESSIONS_COLUMNS = [
+  // ref_no: added for the MacroDroid webhook duplicate-payment guard.
+  // UNIQUE enforcement comes from the partial unique index in schema.sql
+  // (ALTER TABLE ADD COLUMN cannot carry a UNIQUE constraint portably).
+  { name: 'ref_no', type: 'VARCHAR(64)', after: 'client_mac' },
   { name: 'client_ip', type: 'VARCHAR(45)', after: 'client_mac' },
   { name: 'ap_mac', type: 'VARCHAR(32)', after: 'client_ip' },
   { name: 'ssid_name', type: 'VARCHAR(64)', after: 'ap_mac' },
@@ -50,6 +59,30 @@ const VOUCHERS_COLUMNS = [
   { name: 'expires_at', type: 'TIMESTAMP', after: 'created_at' },
 ];
 
+// Columns that may be missing from older production databases
+// Derived from schema.sql — webhook_events table.
+//
+// Constraint note: ALTER TABLE ADD COLUMN cannot add UNIQUE columns on
+// SQLite and cannot add NOT NULL without a DEFAULT on populated tables,
+// so these are plain types. Uniqueness for event_id / ref_no on legacy
+// tables is enforced by the indexes in schema.sql (and by the original
+// column constraints on any table old enough to lack them entirely —
+// all historical schema versions defined event_id with UNIQUE).
+//
+// Legacy width note: the initial schema defined event_id as VARCHAR(64)
+// vs. VARCHAR(128) today. ADD COLUMN cannot widen an existing column,
+// but real event IDs are far below 64 chars, so this is harmless.
+const WEBHOOK_EVENTS_COLUMNS = [
+  { name: 'event_id', type: 'VARCHAR(128)', after: 'id' },
+  { name: 'ref_no', type: 'VARCHAR(64)', after: 'event_id' },
+  { name: 'session_id', type: 'VARCHAR(32)', after: 'ref_no' },
+  { name: 'provider', type: 'VARCHAR(16)', after: 'session_id' },
+  { name: 'event_type', type: 'VARCHAR(64)', after: 'provider' },
+  { name: 'amount', type: 'INTEGER', after: 'event_type' },
+  { name: 'status', type: 'VARCHAR(16)', after: 'amount' },
+  { name: 'processed_at', type: 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP', after: 'status' },
+];
+
 /**
  * Check if a column exists in a given table.
  * @param {Object} db - Database connection
@@ -59,10 +92,12 @@ const VOUCHERS_COLUMNS = [
  */
 async function columnExists(db, tableName, columnName) {
   try {
-    // PostgreSQL
+    // PostgreSQL — table_schema guard prevents false positives if a
+    // same-named table exists in another schema (e.g. pg_temp).
     if (db._driver === 'pg') {
       const result = await db.query(
-        `SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?`,
+        `SELECT 1 FROM information_schema.columns
+         WHERE table_name = ? AND column_name = ? AND table_schema = current_schema()`,
         [tableName, columnName]
       );
       return result.length > 0;
@@ -86,7 +121,8 @@ async function getExistingColumns(db, tableName) {
   try {
     if (db._driver === 'pg') {
       const rows = await db.query(
-        `SELECT column_name FROM information_schema.columns WHERE table_name = ?`,
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_name = ? AND table_schema = current_schema()`,
         [tableName]
       );
       return rows.map(r => r.column_name);
@@ -99,97 +135,67 @@ async function getExistingColumns(db, tableName) {
 }
 
 /**
- * Main migration: ensure all expected columns exist.
+ * Reconcile a table's columns against the expected list.
+ *
+ * Adds any missing columns via ALTER TABLE ADD COLUMN (plain types —
+ * see the constraint notes on the column lists above). Idempotent:
+ * a second run finds no missing columns and changes nothing.
+ *
+ * @param {Object} db - Database connection
+ * @param {string} tableName - Table name
+ * @param {Array<{name: string, type: string}>} expectedColumns
+ */
+async function reconcileTable(db, tableName, expectedColumns) {
+  const existing = await getExistingColumns(db, tableName);
+  if (existing.length === 0) {
+    // Table doesn't exist yet — schema.sql CREATE TABLE will handle it
+    console.log(`[migrate_fix] ${tableName} table not found — CREATE TABLE will handle it.`);
+    return;
+  }
+
+  const missing = expectedColumns.filter(c => !existing.includes(c.name));
+  if (missing.length === 0) {
+    console.log(`[migrate_fix] All ${tableName} columns up to date.`);
+    return;
+  }
+
+  console.log(`[migrate_fix] Adding ${missing.length} missing column(s) to ${tableName}...`);
+  for (const col of missing) {
+    try {
+      await db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${col.name} ${col.type}`);
+      console.log(`[migrate_fix]   + ${col.name} (${col.type})`);
+    } catch (err) {
+      // PostgreSQL 42701 / message match: duplicate column — already added
+      if (err.code === '42701' || (err.message && err.message.includes('already exists'))) {
+        console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
+        continue;
+      }
+      console.warn(`[migrate_fix]   ! ${col.name}: ${err.message}`);
+    }
+  }
+  console.log(`[migrate_fix] ${tableName} table columns updated successfully.`);
+}
+
+/**
+ * Main migration: ensure all expected columns and tables exist.
+ *
+ * Runs BEFORE schema.sql is applied (see migrate.js) so that statements
+ * in schema.sql which reference newer columns (e.g. the ref_no unique
+ * indexes) never hit PostgreSQL 42703 "column does not exist".
  */
 async function fixMissingColumns() {
   const db = getDb();
 
   // --- Sessions table ---
-  let sessionsExists = false;
-  try {
-    const existing = await getExistingColumns(db, 'sessions');
-    sessionsExists = true;
+  await reconcileTable(db, 'sessions', SESSIONS_COLUMNS);
 
-        if (existing.length === 0) {
-      // Table doesn't exist yet — CREATE TABLE will handle it
-      console.log('[migrate_fix] Sessions table not found — CREATE TABLE will handle it.');
-    } else {
-      const missing = SESSIONS_COLUMNS.filter(c => !existing.includes(c.name));
+  // --- Vouchers table ---
+  await reconcileTable(db, 'vouchers', VOUCHERS_COLUMNS);
 
-      if (missing.length === 0) {
-        console.log('[migrate_fix] All sessions columns up to date.');
-      } else {
-        console.log(`[migrate_fix] Adding ${missing.length} missing column(s) to sessions table...`);
-
-        for (const col of missing) {
-          try {
-            // PostgreSQL: columnExists check handles IF NOT EXISTS
-            const exists = await columnExists(db, 'sessions', col.name);
-            if (exists) {
-              console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
-              continue;
-            }
-
-            // SQLite: add column with default
-            await db.exec(`ALTER TABLE sessions ADD COLUMN ${col.name} ${col.type}`);
-            console.log(`[migrate_fix]   + ${col.name} (${col.type})`);
-          } catch (err) {
-            // PostgreSQL: duplicate column name — ignore
-            if (err.code === '42701' || (err.message && err.message.includes('already exists'))) {
-              console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
-              continue;
-            }
-            // Column might already exist — log and skip non-critical errors
-            console.warn(`[migrate_fix]   ! ${col.name}: ${err.message}`);
-          }
-        }
-        console.log('[migrate_fix] Sessions table columns updated successfully.');
-      }
-    }
-  } catch (err) {
-    if (!sessionsExists) {
-      // Table doesn't exist — schema.sql CREATE TABLE will handle it
-    } else {
-      console.error('[migrate_fix] Sessions migration error:', err.message);
-    }
-  }
-
-    // --- Vouchers table ---
-  try {
-    let existingV = await getExistingColumns(db, 'vouchers');
-    if (existingV.length === 0) {
-      // Vouchers table doesn't exist yet — CREATE TABLE will handle it
-      console.log('[migrate_fix] Vouchers table not found — CREATE TABLE will handle it.');
-    } else {
-      const missingV = VOUCHERS_COLUMNS.filter(c => !existingV.includes(c.name));
-      if (missingV.length === 0) {
-        console.log('[migrate_fix] All vouchers columns up to date.');
-      } else {
-        console.log(`[migrate_fix] Adding ${missingV.length} missing column(s) to vouchers table...`);
-
-        for (const col of missingV) {
-          try {
-            const exists = await columnExists(db, 'vouchers', col.name);
-            if (exists) {
-              console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
-              continue;
-            }
-            await db.exec(`ALTER TABLE vouchers ADD COLUMN ${col.name} ${col.type}`);
-            console.log(`[migrate_fix]   + ${col.name} (${col.type})`);
-          } catch (err) {
-            if (err.code === '42701' || (err.message && err.message.includes('already exists'))) {
-              console.log(`[migrate_fix]   ✓ ${col.name} already exists`);
-              continue;
-            }
-            console.warn(`[migrate_fix]   ! ${col.name}: ${err.message}`);
-          }
-        }
-        console.log('[migrate_fix] Vouchers table columns updated successfully.');
-      }
-    }
-  } catch (err) {
-    console.warn('[migrate_fix] Vouchers table migration skipped:', err.message);
-  }
+  // --- Webhook events table ---
+  // (ref_no, amount, status, processed_at may all be missing on legacy DBs —
+  //  the webhook INSERT and its duplicate-payment guard need every one.)
+  await reconcileTable(db, 'webhook_events', WEBHOOK_EVENTS_COLUMNS);
 
   // --- Portal client context table (new — ensure it exists on old DBs) ---
   try {
@@ -225,4 +231,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { fixMissingColumns, columnExists, getExistingColumns };
+module.exports = { fixMissingColumns, columnExists, getExistingColumns, reconcileTable };
