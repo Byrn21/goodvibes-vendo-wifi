@@ -525,6 +525,16 @@
 
   // ---- Handle successful auth ----
   function handleSuccess(result) {
+    // Persist the session identifier so the session status page can find
+    // this device even after the post-login redirect (the sessionId would
+    // otherwise be lost once the user leaves success.html).
+    try {
+      if (result.sessionId) {
+        window.localStorage.setItem('portalSessionId', result.sessionId);
+        window.sessionStorage.setItem('portalSessionId', result.sessionId);
+      }
+    } catch (e) { /* storage unavailable — URL param still works */ }
+
     // Build success URL with redirect and session info
     var params = new URLSearchParams();
     if (result.redirectUrl) params.set('redirectUrl', encodeURIComponent(result.redirectUrl));

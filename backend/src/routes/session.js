@@ -33,7 +33,7 @@ router.get('/status', async (req, res, next) => {
     if (!session) {
       return res.status(404).json({
         success: false,
-        error: 'Session not found.',
+        error: 'No active session exists for this device.',
         code: 'SESSION_NOT_FOUND',
       });
     }
@@ -56,6 +56,7 @@ router.get('/status', async (req, res, next) => {
           startedAt: session.startedAt,
           expiresAt: session.expiresAt,
           voucherType: session.voucherType || 'standard',
+          voucherCode: maskVoucherCode(session.voucherUsed),
           canPause: false,
           canResume: false,
         });
@@ -71,6 +72,7 @@ router.get('/status', async (req, res, next) => {
       startedAt: session.startedAt,
       expiresAt: session.expiresAt,
       voucherType: session.voucherType || 'standard',
+      voucherCode: maskVoucherCode(session.voucherUsed),
       totalSeconds: (session.totalDurationSeconds || (session.duration || 60) * 60),
       canPause:  session.state === 'active' && remainingSeconds > 60 && session.voucherType === 'premium',
       canResume: session.state === 'paused',
@@ -79,6 +81,9 @@ router.get('/status', async (req, res, next) => {
         : null,
     });
   } catch (err) {
+    // Log real database/processing errors server-side — never let them
+    // masquerade as a "session not found" response on the client.
+    console.error('[session/status] Error while fetching session ' + sessionId + ':', err.message, err.stack);
     next(err);
   }
 });
@@ -183,6 +188,18 @@ router.post('/expire', async (req, res, next) => {
 });
 
 // ── Helpers ──────────────────────────────────────────────────
+
+/**
+ * maskVoucherCode — partly mask a voucher code for display on the status
+ * page, e.g. "123456" -> "••••56". Returns null when there is no code.
+ */
+function maskVoucherCode(code) {
+  if (!code || typeof code !== 'string') return null;
+  const cleaned = code.replace(/\s+/g, '');
+  if (cleaned.length < 2) return '••••••';
+  return '••••' + cleaned.slice(-2);
+}
+
 function computeRemaining(session, serverTime) {
   if (!session) return 0;
 

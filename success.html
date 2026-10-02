@@ -116,6 +116,13 @@
 
       // Populate session info if sessionId provided
       if (sessionId) {
+        // Persist the session ID so status.html can recover it later,
+        // even after the auto-redirect takes the user off this page.
+        try {
+          window.localStorage.setItem('portalSessionId', sessionId);
+          window.sessionStorage.setItem('portalSessionId', sessionId);
+        } catch (e) { /* storage unavailable */ }
+
         var infoBox = document.getElementById('session-info');
         var sidEl = document.getElementById('info-session-id');
         var statusLink = document.getElementById('status-link');

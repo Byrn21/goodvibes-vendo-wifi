@@ -14,6 +14,7 @@ const router = express.Router();
 const omadaService = require('../services/omada');
 const { validateVoucher, recordSession } = require('../services/session');
 const { normalizeVoucherCode, validateVoucherCodeFormat } = require('../utils/voucher-code');
+const { normalizeMac: normalizeDeviceMac } = require('../utils/device-id');
 const { v4: uuidv4 } = require('uuid');
 
 // POST /api/auth
@@ -49,8 +50,9 @@ router.post('/', async (req, res, next) => {
       });
     }
 
-    // MAC address normalization and validation
-    const normalizedMac = normalizeMac(clientMac || '');
+    // MAC address normalization and validation (shared helper —
+    // canonical format: uppercase, colon-separated, e.g. AA:BB:CC:DD:EE:FF)
+    const normalizedMac = normalizeDeviceMac(clientMac || '');
     if (clientMac && !normalizedMac) {
       return res.status(400).json({ success: false, error: 'Invalid client MAC address.', code: 'INVALID_MAC' });
     }
@@ -143,12 +145,8 @@ router.post('/', async (req, res, next) => {
 });
 
 // ── Helpers ──────────────────────────────────────────────────
-function normalizeMac(mac) {
-  if (!mac || typeof mac !== 'string') return null;
-  const cleaned = mac.replace(/[^0-9a-fA-F]/g, '').toLowerCase();
-  if (cleaned.length !== 12) return null;
-  return cleaned.match(/.{2}/g).join(':');
-}
+// MAC normalization uses the shared utils/device-id.js helper so the
+// saved format (uppercase, colon-separated) always matches lookups.
 
 function isAllowedRedirect(url) {
   if (!url) return true; // No redirect is fine
