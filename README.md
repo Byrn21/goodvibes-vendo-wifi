@@ -225,7 +225,8 @@ PAUSE_ENABLED=true
 # === Security ===
 JWT_SECRET=change-me-in-production
 RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=20
+RATE_LIMIT_MAX_REQUESTS=600
+LOGIN_RATE_LIMIT_MAX=25
 CORS_ORIGINS=https://portal.your-domain.com
 
 # === Logging ===

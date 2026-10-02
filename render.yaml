@@ -30,12 +30,14 @@ services:
       - key: RATE_LIMIT_WINDOW_MS
         value: 900000
       - key: RATE_LIMIT_MAX_REQUESTS
-        value: 20
+        value: 600
+      - key: LOGIN_RATE_LIMIT_MAX
+        value: 25
       - key: LOG_LEVEL
         value: info
       - key: DEFAULT_REDIRECT_URL
         value: https://www.google.com
-      # Secrets — set these in the Render dashboard
+      # Secrets ï¿½ set these in the Render dashboard
       # ADMIN_API_KEY
       # ADMIN_USERNAME
       # ADMIN_PASSWORD

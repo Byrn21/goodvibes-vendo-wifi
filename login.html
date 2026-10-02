@@ -48,7 +48,70 @@
       var btn = document.getElementById('login-btn');
       var errorDiv = document.getElementById('login-error');
 
+      var MAX_AUTO_RETRIES = 3;
+      var autoRetryCount = 0;
+      var retryTimer = null;
+
+      function setDisabled(disabled) {
+        btn.disabled = disabled;
+        btn.textContent = disabled ? 'Please wait…' : 'Log In';
+      }
+
+      // Live countdown, then retry the login automatically
+      function scheduleRetry(seconds, username, password) {
+        if (retryTimer) clearInterval(retryTimer);
+        var remaining = Math.min(seconds, 900); // cap display at 15 min
+        setDisabled(true);
+        retryTimer = setInterval(function () {
+          errorDiv.textContent = 'Too many login attempts. Retrying in ' + remaining + ' second' + (remaining === 1 ? '' : 's') + '…';
+          remaining--;
+          if (remaining < 0) {
+            clearInterval(retryTimer);
+            retryTimer = null;
+            attemptLogin(username, password);
+          }
+        }, 1000);
+      }
+
+      function attemptLogin(username, password) {
+        errorDiv.textContent = '';
+        setDisabled(true);
+
+        fetch(API_BASE + '/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: username, password: password })
+        }).then(function (r) {
+          return r.json().then(function (d) { return { ok: r.ok, status: r.status, data: d }; });
+        }).then(function (res) {
+          if (res.ok && res.data.success) {
+            if (retryTimer) { clearInterval(retryTimer); retryTimer = null; }
+            localStorage.setItem('adminToken', res.data.token);
+            window.location.href = 'admin.html';
+            return;
+          }
+          if (res.status === 429 || res.data.code === 'RATE_LIMITED') {
+            var waitSecs = parseInt(res.data.retryAfterSeconds, 10);
+            // Fallback: backend always sends retryAfterSeconds, but if it is
+            // missing (e.g. an older server), default to 60 seconds.
+            if (isNaN(waitSecs) || waitSecs <= 0) waitSecs = 60;
+            errorDiv.textContent = res.data.error || 'Too many login attempts. Please try again later.';
+            if (autoRetryCount < MAX_AUTO_RETRIES) {
+              autoRetryCount++;
+              scheduleRetry(waitSecs, username, password);
+            }
+            return;
+          }
+          setDisabled(false);
+          errorDiv.textContent = res.data.error || 'Login failed. Check your credentials.';
+        }).catch(function (err) {
+          setDisabled(false);
+          errorDiv.textContent = 'Connection error: ' + err.message;
+        });
+      }
+
       btn.addEventListener('click', function () {
+        if (retryTimer) { clearInterval(retryTimer); retryTimer = null; }
         var username = document.getElementById('username').value.trim();
         var password = document.getElementById('password').value;
 
@@ -57,24 +120,8 @@
           return;
         }
 
-        errorDiv.textContent = '';
-
-        fetch(API_BASE + '/api/admin/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: username, password: password })
-        }).then(function (r) {
-          return r.json().then(function (d) { return { ok: r.ok, data: d }; });
-        }).then(function (res) {
-          if (!res.ok || !res.data.success) {
-            errorDiv.textContent = res.data.error || 'Login failed. Check your credentials.';
-            return;
-          }
-          localStorage.setItem('adminToken', res.data.token);
-          window.location.href = 'admin.html';
-        }).catch(function (err) {
-          errorDiv.textContent = 'Connection error: ' + err.message;
-        });
+        autoRetryCount = 0;
+        attemptLogin(username, password);
       });
     })();
   </script>

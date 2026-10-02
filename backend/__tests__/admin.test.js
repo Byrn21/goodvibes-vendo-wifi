@@ -30,6 +30,7 @@ process.env.NODE_ENV = 'test';
 process.env.PORT = '0';
 process.env.OMADA_BASE_URL = '';
 process.env.RATE_LIMIT_MAX_REQUESTS = '10000';
+process.env.LOGIN_RATE_LIMIT_MAX = '10000';
 
 // Require the Express app AFTER env is set
 const request = require('supertest');

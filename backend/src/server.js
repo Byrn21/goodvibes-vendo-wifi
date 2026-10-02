@@ -25,6 +25,10 @@ const { startExpirationWorker } = require('./services/session');
 const { fixMissingColumns } = require('./db/migrate_fix');
 
 const app = express();
+
+// Trust the first proxy hop (Render, Nginx, etc.) so req.ip resolves to the
+// client's real IP from X-Forwarded-For — required for correct per-IP limits.
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:8080';
@@ -74,18 +78,56 @@ app.use(express.json({ limit: '16kb' }));
 app.use(express.urlencoded({ extended: true, limit: '16kb' }));
 
 // ── Rate limiting ────────────────────────────────────────────
-const limiter = rateLimit({
+// Strict limiter for login endpoints only (admin login + voucher auth).
+// Successful logins do NOT count toward the limit (skipSuccessfulRequests),
+// so logging out and back in — even from another device — never locks out a
+// legitimate user. Only repeated FAILED attempts are throttled.
+const loginLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 min
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '20', 10),
+  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '25', 10),
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'Too many requests. Please wait.', code: 'RATE_LIMITED' },
+  skipSuccessfulRequests: true,
+  message: { success: false, error: 'Too many login attempts. Please try again later.', code: 'RATE_LIMITED' },
+  handler: (req, res) => {
+    const resetMs = req.rateLimit && req.rateLimit.resetTime
+      ? Math.max(0, req.rateLimit.resetTime.getTime() - Date.now())
+      : parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10);
+    const retryAfterSecs = Math.max(1, Math.ceil(resetMs / 1000));
+    const mins = Math.max(1, Math.ceil(retryAfterSecs / 60));
+    res.status(429)
+      .set('Retry-After', String(retryAfterSecs))
+      .json({
+        success: false,
+        error: 'Too many login attempts. Please try again in ' + mins + ' minute' + (mins === 1 ? '' : 's') + '.',
+        code: 'RATE_LIMITED',
+        retryAfterSeconds: retryAfterSecs,
+      });
+  },
   // Disable X-Forwarded-For validation — Render's proxy header format triggers ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
   validate: {
     xForwardedForHeader: false,
   },
 });
-app.use('/api/', limiter);
+
+// Generous limiter for the rest of the API (dashboard stats, voucher list,
+// session list, logout, etc.). High enough that normal admin usage and client
+// polling never reach it — it exists only as an abuse safety net.
+const apiLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 min
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '600', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests. Please wait.', code: 'RATE_LIMITED' },
+  validate: {
+    xForwardedForHeader: false,
+  },
+});
+
+// Login endpoints get the strict limiter; everything else the generous one
+app.use('/api/admin/login', loginLimiter);
+app.use('/api/auth', loginLimiter);
+app.use('/api/', apiLimiter);
 
 // ── Routes ───────────────────────────────────────────────────
 app.use('/api/auth',     authRoutes);
