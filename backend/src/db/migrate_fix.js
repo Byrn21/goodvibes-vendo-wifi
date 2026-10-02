@@ -20,6 +20,10 @@ const { getDb, closeDb } = require('./client');
 // Columns that may be missing from older production databases
 // Derived from schema.sql — sessions table
 const SESSIONS_COLUMNS = [
+  // session_id: indexed in schema.sql (idx_sessions_session_id), so it must
+  // exist before Phase 2 or that index fails with 42703. NOT NULL needs a
+  // DEFAULT for ALTER TABLE on populated tables.
+  { name: 'session_id', type: "VARCHAR(32) NOT NULL DEFAULT ''", after: 'id' },
   // ref_no: added for the MacroDroid webhook duplicate-payment guard.
   // UNIQUE enforcement comes from the partial unique index in schema.sql
   // (ALTER TABLE ADD COLUMN cannot carry a UNIQUE constraint portably).
