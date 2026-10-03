@@ -1,0 +1,23 @@
+#!/bin/sh
+# ================================================================
+# pre-commit hook — rebuilds portal-upload.zip on every commit
+#
+# Activated with:  git config core.hooksPath scripts/hooks
+# (run once per clone; the hook lives in the repo)
+# ================================================================
+
+echo "[pre-commit] Rebuilding portal-upload.zip..."
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass \
+  -File "$(git rev-parse --show-toplevel)/scripts/build-portal-zip.ps1"
+
+if [ $? -ne 0 ]; then
+  echo "[pre-commit] ERROR: portal zip build failed — commit aborted." >&2
+  exit 1
+fi
+
+# Stage the freshly built zip into this commit
+git add portal-upload.zip
+
+echo "[pre-commit] portal-upload.zip updated and staged."
+exit 0
