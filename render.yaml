@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: omada-captive-portal
+    name: goodvibesvendowifi
     plan: free
     region: oregon
     env: docker
@@ -26,7 +26,7 @@ services:
       - key: SESSION_ENFORCE_INTERVAL
         value: 60000
       - key: CORS_ORIGINS
-        value: https://omada-captive-portal.onrender.com
+        value: https://goodvibesvendowifi.onrender.com
       - key: RATE_LIMIT_WINDOW_MS
         value: 900000
       - key: RATE_LIMIT_MAX_REQUESTS

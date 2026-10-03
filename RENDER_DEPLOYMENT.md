@@ -36,7 +36,7 @@ Render provisions the database and builds your Docker container in 2-4 minutes.
 4. Configure:
 
 ```
-Name: omada-captive-portal
+Name: goodvibesvendowifi
 Region: Oregon (or closest to you)
 Branch: main
 Environment: Docker
@@ -66,7 +66,7 @@ After deployment (or during manual setup), set these secrets in the **Render Das
 ```bash
 # --- Application URLs ---
 # Set after first deploy; find your URL in the Render dashboard
-BASE_URL=https://your-app-name.onrender.com
+BASE_URL=https://goodvibesvendowifi.onrender.com
 FRONTEND_ORIGIN=https://your-frontend-url.pages.dev
 
 # --- Omada Controller ---
@@ -146,7 +146,7 @@ The server starts on `http://localhost:3000` by default.
 Edit `config/config.js` and set your Render backend URL:
 
 ```javascript
-apiBaseUrl: 'https://your-app-name.onrender.com',
+apiBaseUrl: 'https://goodvibesvendowifi.onrender.com',
 ```
 
 ### **2. Generate JWT Secret**
@@ -161,7 +161,7 @@ Paste the output into the `JWT_SECRET` environment variable in the Render dashbo
 
 ```bash
 # Health check
-curl https://your-app-name.onrender.com/api/health
+curl https://goodvibesvendowifi.onrender.com/api/health
 
 # Expected response:
 # {"success":true,"message":"Server is healthy"}

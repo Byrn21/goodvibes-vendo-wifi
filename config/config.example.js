@@ -73,7 +73,7 @@
     // ==============================================================
 
     // Base URL of your backend server (no trailing slash)
-    apiBaseUrl: 'https://your-app-name.onrender.com',
+    apiBaseUrl: 'https://goodvibesvendowifi.onrender.com',
 
     // ==============================================================
     // VOUCHER VALIDATION (frontend hints only â€” backend enforces)
